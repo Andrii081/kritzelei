@@ -97,7 +97,7 @@ button{touch-action:manipulation;cursor:pointer}
 .barin > *{flex:0 0 auto}
 .sep{width:1px;height:26px;background:var(--line);margin:0 4px;display:inline-block;vertical-align:middle}
 .ib{width:38px;height:40px;display:inline-grid;place-items:center;border:0;border-radius:9px;background:transparent;color:var(--ink)}
-.ib svg{width:22px;height:22px}
+.ib svg{width:24px;height:24px;display:block}
 .ib[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .ib:disabled{opacity:.35;cursor:default}
 .nbtitle{font-weight:600;max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
@@ -236,21 +236,21 @@ button{touch-action:manipulation;cursor:pointer}
       <button class="ib" id="backBtn" type="button" title="Back to notebooks" data-i18n-title="toNbs" aria-label="Back to notebooks" data-i18n-aria-label="toNbs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
       <span class="nbtitle" id="nbTitle"></span>
       <span class="sep"></span>
-      <button class="ib" data-tool="pen" type="button" title="Pen" data-i18n-title="t_pen" aria-label="Pen" data-i18n-aria-label="t_pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.2-4.6L16.5 4.1a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z"/><path d="M14.5 6l3.5 3.5"/></svg></button>
-      <button class="ib" data-tool="hl" type="button" title="Highlighter" data-i18n-title="t_hl" aria-label="Highlighter" data-i18n-aria-label="t_hl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 15l-3 3h5l1-1"/><path d="M9 15l7.5-7.5 3 3L12 18z"/><path d="M14.5 5.5l2-2 4 4-2 2"/><path d="M3 21h18" stroke-linecap="round"/></svg></button>
-      <button class="ib" data-tool="ln" type="button" title="Line (ruler)" data-i18n-title="t_ln" aria-label="Line" data-i18n-aria-label="line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 17.5L17.5 3 21 6.5 6.5 21z"/><path d="M7 13.5l1.5 1.5M10 10.5l2 2M13 7.5l1.5 1.5"/></svg></button>
-      <button class="ib" data-tool="shape" type="button" title="Shapes and dimensions" data-i18n-title="t_shape" aria-label="Shapes" data-i18n-aria-label="shapes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="9" r="5.5"/><rect x="11" y="11" width="9.5" height="9.5" rx="1"/></svg></button>
-      <button class="ib" data-tool="lasso" type="button" title="Lasso" data-i18n-title="lasso" aria-label="Lasso" data-i18n-aria-label="lasso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><ellipse cx="12" cy="9.5" rx="8.5" ry="5.5" stroke-dasharray="3 2.4"/><path d="M7.5 14.3c-.9 1.8-.3 4 1.6 4.7l-.8 2.5"/></svg></button>
+      <button class="ib" data-tool="pen" type="button" title="Pen" data-i18n-title="t_pen" aria-label="Pen" data-i18n-aria-label="t_pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20l1.2-4.6L16.5 4.1a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z"/><path d="M14.5 6l3.5 3.5"/></svg></button>
+      <button class="ib" data-tool="hl" type="button" title="Highlighter" data-i18n-title="t_hl" aria-label="Highlighter" data-i18n-aria-label="t_hl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 15l-3 3h5l1-1"/><path d="M9 15l7.5-7.5 3 3L12 18z"/><path d="M14.5 5.5l2-2 4 4-2 2"/><path d="M3 21h18" stroke-linecap="round"/></svg></button>
+      <button class="ib" data-tool="ln" type="button" title="Line (ruler)" data-i18n-title="t_ln" aria-label="Line" data-i18n-aria-label="line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 17.5L17.5 3 21 6.5 6.5 21z"/><path d="M7 13.5l1.5 1.5M10 10.5l2 2M13 7.5l1.5 1.5"/></svg></button>
+      <button class="ib" data-tool="shape" type="button" title="Shapes and dimensions" data-i18n-title="t_shape" aria-label="Shapes" data-i18n-aria-label="shapes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="5.5"/><rect x="11" y="11" width="9.5" height="9.5" rx="1"/></svg></button>
+      <button class="ib" data-tool="lasso" type="button" title="Lasso" data-i18n-title="lasso" aria-label="Lasso" data-i18n-aria-label="lasso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="9.5" rx="8.5" ry="5.5" stroke-dasharray="3 2.4"/><path d="M7.5 14.3c-.9 1.8-.3 4 1.6 4.7l-.8 2.5"/></svg></button>
       <button class="ib" data-tool="text" type="button" title="Text" data-i18n-title="text" aria-label="Text" data-i18n-aria-label="text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 6.5V4.5h14v2M12 4.5v15M9 19.5h6"/></svg></button>
-      <button class="ib" data-tool="an" type="button" title="Protractor" data-i18n-title="protractor" aria-label="Protractor" data-i18n-aria-label="protractor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 18.5a9.5 9.5 0 0 1 19 0z"/><path d="M12 18.5L17 11"/><path d="M5.5 12.5l1 .8M12 9v1.3M18.5 12.5l-1 .8"/></svg></button>
-      <button class="ib" data-tool="er" type="button" title="Eraser" data-i18n-title="eraser" aria-label="Eraser" data-i18n-aria-label="eraser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M8.5 20H20"/><path d="M4.4 15.6l9.9-9.9a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11 19H8.2z"/><path d="M9 11l5 5"/></svg></button>
+      <button class="ib" data-tool="an" type="button" title="Protractor" data-i18n-title="protractor" aria-label="Protractor" data-i18n-aria-label="protractor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 18.5a9.5 9.5 0 0 1 19 0z"/><path d="M12 18.5L17 11"/><path d="M5.5 12.5l1 .8M12 9v1.3M18.5 12.5l-1 .8"/></svg></button>
+      <button class="ib" data-tool="er" type="button" title="Eraser" data-i18n-title="eraser" aria-label="Eraser" data-i18n-aria-label="eraser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8.5 20H20"/><path d="M4.4 15.6l9.9-9.9a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11 19H8.2z"/><path d="M9 11l5 5"/></svg></button>
       <span class="sep"></span>
-      <button class="ib" id="photoBtn" type="button" title="Insert photo" data-i18n-title="insertPhoto" aria-label="Insert photo" data-i18n-aria-label="insertPhoto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-8.5 8"/></svg></button>
-      <button class="ib" id="scanBtn" type="button" title="Scan document" data-i18n-title="scanDoc" aria-label="Scan document" data-i18n-aria-label="scanDoc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/></svg></button>
+      <button class="ib" id="photoBtn" type="button" title="Insert photo" data-i18n-title="insertPhoto" aria-label="Insert photo" data-i18n-aria-label="insertPhoto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-8.5 8"/></svg></button>
+      <button class="ib" id="scanBtn" type="button" title="Scan document" data-i18n-title="scanDoc" aria-label="Scan document" data-i18n-aria-label="scanDoc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/></svg></button>
       <button class="ib" id="undoBtn" type="button" title="Undo" data-i18n-title="undo" aria-label="Undo" data-i18n-aria-label="undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
       <button class="ib" id="redoBtn" type="button" title="Redo" data-i18n-title="redo" aria-label="Redo" data-i18n-aria-label="redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
-      <button class="ib" id="pvBtn" type="button" title="All pages" data-i18n-title="allPages" aria-label="All pages" data-i18n-aria-label="allPages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="6.5" height="7" rx="1"/><rect x="13.5" y="4" width="6.5" height="7" rx="1"/><rect x="4" y="13.5" width="6.5" height="7" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="7" rx="1"/></svg></button>
-      <button class="ib" id="addPageBtn" type="button" title="New page after the current one" data-i18n-title="newPageAfter" aria-label="New page" data-i18n-aria-label="newPage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg></button>
+      <button class="ib" id="pvBtn" type="button" title="All pages" data-i18n-title="allPages" aria-label="All pages" data-i18n-aria-label="allPages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="7" rx="1"/><rect x="13.5" y="4" width="6.5" height="7" rx="1"/><rect x="4" y="13.5" width="6.5" height="7" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="7" rx="1"/></svg></button>
+      <button class="ib" id="addPageBtn" type="button" title="New page after the current one" data-i18n-title="newPageAfter" aria-label="New page" data-i18n-aria-label="newPage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg></button>
       <button class="ib" id="menuBtn" type="button" title="More" data-i18n-title="more" aria-label="More" data-i18n-aria-label="more" aria-expanded="false"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
       <span class="status" id="status"></span>
     </div>
@@ -922,8 +922,11 @@ function drawLabel(ctx,pg,text,x,y){
   ctx.fillStyle="#fff"; ctx.textBaseline="bottom"; ctx.fillText(text,lx,ly-pad*.2); ctx.restore();
 }
 let scrollRaf=0;
-scroller.addEventListener("scroll",()=>{ if(!scrollRaf) scrollRaf=requestAnimationFrame(()=>{ scrollRaf=0; for(const pg of nearPages) updateRegion(pg); }); },{passive:true});
-let rsT; window.addEventListener("resize",()=>{ clearTimeout(rsT); rsT=setTimeout(()=>{ if(!S.nb) return; layoutZoom(); afterLayout(); },150); });
+scroller.addEventListener("scroll",()=>{ if(!scrollRaf) scrollRaf=requestAnimationFrame(()=>{ scrollRaf=0; endlessScrollGrow(); for(const pg of nearPages) updateRegion(pg); }); },{passive:true});
+let rsT; window.addEventListener("resize",()=>{ clearTimeout(rsT); rsT=setTimeout(()=>{ if(!S.nb) return; fitTitle(); layoutZoom(); afterLayout(); },150); });
+// The notebook title has a fractional text width; everything to its right would then sit between device pixels,
+// and Safari draws the toolbar icons blurry. Rounding the title box to whole pixels keeps every icon on the pixel grid.
+function fitTitle(){ const t=$("nbTitle"); if(!t||$("nb").hidden) return; t.style.width=""; t.style.maxWidth=""; const w=t.getBoundingClientRect().width; if(w>0){ t.style.maxWidth="none"; t.style.width=Math.ceil(w)+"px"; } }
 
 /* ---------- zoom ---------- */
 function layoutZoom(){ const avail=scroller.clientWidth-32; S.baseW=Math.max(200,Math.min(880,avail||880)); pagesEl.style.setProperty("--pw",Math.round(S.baseW*S.zoom)+"px"); $("zoomReset").textContent=Math.round(S.zoom*100)+"%"; }
@@ -1012,7 +1015,7 @@ $("endlessTog").onchange=()=>{ if(!S.nb) return; S.nb.endless=$("endlessTog").ch
 function renderPaperSeg(){ segButtons($("paperSeg"),PAPERS_L(),S.nb.paper,(k)=>{ S.nb.paper=k; metaDirty=true; buildPages(); scheduleSave(); }); }
 async function openNb(m,fresh){
   S.nb=m; S.undo=[]; S.redo=[]; S.pages=[]; S.sel=null;
-  $("lib").hidden=true; $("nb").hidden=false; $("nbTitle").textContent=m.title; $("menu").hidden=true; $("menuBtn").setAttribute("aria-expanded","false");
+  $("lib").hidden=true; $("nb").hidden=false; $("nbTitle").textContent=m.title; fitTitle(); $("menu").hidden=true; $("menuBtn").setAttribute("aria-expanded","false");
   renderPaperSeg();
   setStatus(tt("opening")); pagesEl.innerHTML="";
   let stored={};
@@ -1025,7 +1028,7 @@ async function openNb(m,fresh){
   $("endlessTog").checked=!!m.endless;
   if(fresh) for(const pg of S.pages) dirty.add(pg);
   scroller.scrollTop=0; scroller.scrollLeft=0;
-  buildPages(); renderTools(); updateUndoBtns(); setStatus(""); if(fresh) scheduleSave();
+  buildPages(); renderTools(); updateUndoBtns(); setStatus(""); requestAnimationFrame(endlessScrollGrow); if(fresh) scheduleSave();
 }
 $("backBtn").onclick=async ()=>{ finishText(); closePop(); clearSel(); await flush(); io.disconnect(); nearPages.clear(); for(const pg of S.pages) releaseCanvas(pg); for(const k in OV) clearOverlay(k); pagesEl.innerHTML=""; S.nb=null; S.pages=[]; $("nb").hidden=true; $("pv").hidden=true; $("lib").hidden=false; renderLib(); window.scrollTo(0,0); };
 
@@ -1103,6 +1106,14 @@ function touchPage(pg){ dirty.add(pg); redraw(pg); autoGrow(pg); scheduleSave();
 const GROW_PAD=A4H/2;
 const growsAuto=(pg)=>!!(S.nb&&S.nb.endless&&!pg.bg);
 function contentBottom(pg){ let b=0; for(const it of pg.strokes){ const q=bbox(it); if(q[3]>b) b=q[3]; } return b; }
+function endlessScrollGrow(){
+  // the last page of an endless notebook always keeps at least one more screen of empty paper below the visible area
+  if(!S.nb||!S.nb.endless||pinch) return; const last=S.pages[S.pages.length-1]; if(!last||!growsAuto(last)||!last.el) return;
+  const ch=scroller.clientHeight, left=scroller.scrollHeight-(scroller.scrollTop+ch); if(left>ch*1.2) return;
+  const k=last.el.getBoundingClientRect().width/W; if(!(k>0)) return;
+  const add=Math.max(GROW_PAD,Math.ceil(ch*1.5/k/GROW_PAD)*GROW_PAD);
+  last.h=pageH(last)+add; metaDirty=true; last.el.style.aspectRatio=W+" / "+last.h; if(last.cv) updateRegion(last,true); scheduleSave();
+}
 function autoGrow(pg,shrink){
   if(!growsAuto(pg)) return;
   const need=Math.max(A4H,Math.ceil((contentBottom(pg)+GROW_PAD)/GROW_PAD)*GROW_PAD), cur=pageH(pg);
@@ -2130,7 +2141,7 @@ $("pdfBtn").onclick=async ()=>{
 
 /* ---- empty-state scribble ---- */
 (function(){ const c=$("emptyArt"), x=c.getContext("2d"); x.scale(2,2); const s={t:"p",c:getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||ACC,w:2.6,p:[]}; for(let i=0;i<=120;i++){ const t=i/120; s.p.push(10+t*190,48+Math.sin(t*Math.PI*5)*18*(1-t*.4)+Math.cos(t*23)*3,.35+.6*Math.sin(t*Math.PI)); } drawStroke(x,s); })();
-if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ fontEpoch++; for(const pg of S.pages) if(pg.ctx) redraw(pg); });
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ fontEpoch++; fitTitle(); for(const pg of S.pages) if(pg.ctx) redraw(pg); });
 
 /* ---- init ---- */
 async function init(){
