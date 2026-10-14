@@ -11,6 +11,9 @@
 
 ## Features
 - Notebooks with folders and search; paper: grid, lined, dots, graph paper, isometric, Cornell, blank
+- **Endless page** that grows while you write — or classic A4 pages, your choice for every notebook
+- **Document scanner**: finds the edges of the sheet automatically, straightens the perspective, removes the background and fits the page to A4 (colour, black & white or original)
+- **Opens GoodNotes files** (.goodnotes): pages and PDF worksheets are imported in the right order (handwriting from GoodNotes is not transferred yet)
 - Fountain pen (pressure-sensitive), ballpoint, highlighter, eraser (whole strokes or parts)
 - Ruler line with exact length (cm) and angle; protractor to measure existing angles
 - Tap a line to change length, angle and colour; press and drag to move it; horizontal and vertical lines snap to the grid
