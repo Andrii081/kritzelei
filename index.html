@@ -350,7 +350,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v11";
+const APP_VER="v12";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
 const ZMIN=0.5, ZMAX=4, MAXPX=8e6;
@@ -1252,7 +1252,9 @@ const calc={expr:"",ans:0,hist:[],second:false,done:false};
 const calcSep=()=>fmt1(1.5,1).charAt(1);
 function calcEval(src){
   const deg=S.calcDeg!==false, s=src, toR=(x)=>deg?x*Math.PI/180:x, fromR=(x)=>deg?x*180/Math.PI:x; let i=0;
-  const F={sin:x=>Math.sin(toR(x)),cos:x=>Math.cos(toR(x)),tan:x=>Math.tan(toR(x)),asin:x=>fromR(Math.asin(x)),acos:x=>fromR(Math.acos(x)),atan:x=>fromR(Math.atan(x)),ln:Math.log,log:Math.log10};
+  // exact values at multiples of 90° (cos 270° = 0, not -1,8e-16); tiny rounding leftovers become 0
+  const trig=(f,x)=>{ if(deg){ const m=((x%360)+360)%360; if(m%90===0){ const k=m/90; return f==="sin"?[0,1,0,-1][k]:f==="cos"?[1,0,-1,0][k]:(k%2?NaN:0); } } const r=Math[f](toR(x)); return Math.abs(r)<1e-14?0:r; };
+  const F={sin:x=>trig("sin",x),cos:x=>trig("cos",x),tan:x=>trig("tan",x),asin:x=>fromR(Math.asin(x)),acos:x=>fromR(Math.acos(x)),atan:x=>fromR(Math.atan(x)),ln:Math.log,log:Math.log10};
   const fail=()=>{ throw new Error("calc"); }, starts=(c)=>c!=null&&/[0-9.(πA√a-z]/.test(c);
   const expr=()=>{ let v=term(); while(s[i]==="+"||s[i]==="−"){ const o=s[i++], r=term(); v=o==="+"?v+r:v-r; } return v; };
   const term=()=>{ let v=unary(); for(;;){ const c=s[i]; if(c==="×"||c==="÷"){ i++; const r=unary(); v=c==="×"?v*r:v/r; } else if(starts(c)) v*=power(); else return v; } };
