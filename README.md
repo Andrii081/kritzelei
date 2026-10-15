@@ -14,6 +14,8 @@
 - **Endless page** that grows while you write — or classic A4 pages, your choice for every notebook
 - **Document scanner**: finds the edges of the sheet automatically, straightens the perspective, removes the background and fits the page to A4 (colour, black & white or original)
 - **Exact drawing**: line, arrow, dimension and shape ends stick to the grid lines and their corners (a mark shows it), lengths round to whole millimetres — switch off „Snap“ for any odd size
+- **Dimensions as in technical drawing**: tap a line for its length with extension lines, drag from line to line for their true distance, angular dimensions between two lines; type a new value and the second line moves or turns
+- **Calculator** that stays open while you write (sin/cos/tan in degrees, roots, powers, history)
 - **Opens GoodNotes files** (.goodnotes): pages and PDF worksheets are imported in the right order (handwriting from GoodNotes is not transferred yet)
 - Fountain pen (pressure-sensitive), ballpoint, highlighter, eraser (whole strokes or parts)
 - Ruler line with exact length (cm) and angle; protractor to measure existing angles
