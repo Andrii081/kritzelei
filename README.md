@@ -16,7 +16,9 @@
 - **Exact drawing**: line, arrow, dimension and shape ends stick to the grid lines and their corners (a mark shows it), lengths round to whole millimetres — switch off „Snap“ for any odd size
 - **Dimensions as in technical drawing**: tap a line for its length with extension lines, drag from line to line for their true distance, angular dimensions between two lines; type a new value and the second line moves or turns
 - **Updates itself**: a new version is fetched as soon as the app comes back to the screen; the version number is shown under „…“
-- **Calculator** that stays open while you write (sin/cos/tan in degrees, roots, powers, history)
+- **Photo and scan buttons also take PDF and GoodNotes files** — their pages go in right after the page you are on
+- **QR codes** on photos and scans are recognised automatically: open the link, copy it or insert it as text
+- **Calculator** that stays open while you write (sin/cos/tan in degrees, roots, powers, history); tap any number or sign in the line to correct just that one
 - **Opens GoodNotes files** (.goodnotes): pages and PDF worksheets are imported in the right order (handwriting from GoodNotes is not transferred yet)
 - Fountain pen (pressure-sensitive), ballpoint, highlighter, eraser (whole strokes or parts)
 - Ruler line with exact length (cm) and angle; protractor to measure existing angles

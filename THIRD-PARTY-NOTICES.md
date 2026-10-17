@@ -6,6 +6,7 @@ Kritzelei includes the following third-party software. These files keep their ow
 |---|---|---|
 | `pdf.min.js`, `pdf.worker.min.js` | [PDF.js](https://github.com/mozilla/pdf.js) 3.11.174 — Copyright Mozilla Foundation | Apache License 2.0 |
 | `jspdf.umd.min.js` | [jsPDF](https://github.com/parallax/jsPDF) 2.5.1 — Copyright James Hall, yWorks GmbH and contributors | MIT License |
+| `jsQR.min.js` | [jsQR](https://github.com/cozmo/jsQR) 1.4.0 — Copyright Cosmo Wolfe | Apache License 2.0 (same text as PDF.js below) |
 
 The original license headers are kept at the top of each library file.
 
