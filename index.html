@@ -138,6 +138,26 @@ button{touch-action:manipulation;cursor:pointer}
 .pfoot button.star[aria-pressed="true"]{color:#d98a00}
 .pfoot select{border:1px solid var(--line);border-radius:6px;background:var(--raise);font-size:12.5px;padding:2px 4px;color:var(--muted)}
 .addpage{border:1.5px dashed var(--line);background:transparent;border-radius:10px;padding:14px 22px;color:var(--muted);font-weight:500;width:var(--pw,880px)}
+/* Short A4 note insertions between original PDF pages */
+.insertnote{width:var(--pw,880px);border:1px dashed var(--line);border-radius:8px;background:var(--surface);color:var(--muted);font-size:13px;padding:5px 10px;min-height:28px}
+.insertnote:focus-visible,.insertnote:hover{color:var(--accent);border-color:var(--accent)}
+.notehint{font-size:11px;opacity:.75}
+/* An in-app color palette works even if Safari refuses to open a hidden color input. */
+.palette-cover{position:fixed;inset:0;z-index:70;background:rgba(18,24,38,.48);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box}
+.palette-dialog{width:min(465px,100%);max-height:min(90dvh,750px);overflow:auto;background:var(--raise);color:var(--ink);border-radius:16px;box-shadow:0 18px 65px rgba(0,0,0,.32);padding:16px;display:grid;gap:12px;box-sizing:border-box}
+.palette-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.palette-head strong{font-size:17px}
+.palette-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+.palette-grid button{border:1px solid rgba(0,0,0,.15);border-radius:6px;aspect-ratio:1;background:var(--sample);padding:0;min-width:0}
+.palette-grid button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.palette-line{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.palette-line label{min-width:86px;font-size:13px}
+.palette-line input[type=range]{flex:1;min-width:130px;accent-color:var(--accent)}
+.palette-hex{width:104px;border:1px solid var(--line);border-radius:7px;padding:7px;background:var(--surface);font-size:15px}
+.palette-preview{width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:#7a3fc0;flex:none}
+.palette-line input[type=color]{width:40px;height:35px;border:1px solid var(--line);background:transparent;border-radius:6px;padding:2px}
+.palette-footer{display:flex;gap:8px;justify-content:flex-end}
+@media (max-width:450px){.palette-dialog{padding:12px}.palette-grid{gap:3px}.palette-line label{min-width:70px}}
 .selmenu{position:absolute;z-index:4;display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:360px;background:var(--raise);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 28px -10px var(--paper-shadow);cursor:default;-webkit-user-select:none;user-select:none}
 .selmenu .sw{width:26px;height:26px}.selmenu .sw i{width:17px;height:17px}
 .selmenu .btn{padding:5px 8px;font-size:13px}
@@ -350,7 +370,17 @@ button{touch-action:manipulation;cursor:pointer}
   <div class="qrtext" id="qrText"></div>
   <div class="poprow"><button class="btn primary" id="qrOpen" type="button"><span data-i18n="qrOpen">Open link</span></button><button class="btn" id="qrInsert" type="button"><span data-i18n="qrInsert">Insert as text</span></button><button class="btn" id="qrCopy" type="button"><span data-i18n="copy">Copy</span></button><button class="btn" id="qrClose" type="button"><span data-i18n="done">Done</span></button></div>
 </div>
-<input type="color" id="colorPick" value="#7a3fc0" hidden>
+<div id="paletteModal" class="palette-cover" hidden role="dialog" aria-modal="true" aria-label="Color palette">
+  <div class="palette-dialog">
+    <div class="palette-head"><strong id="paletteTitle">Color palette</strong><button type="button" id="paletteClose" class="btn sm" aria-label="Close">✕</button></div>
+    <div id="paletteGrid" class="palette-grid" aria-label="More colors"></div>
+    <div class="palette-line"><label id="paletteHueLabel" for="paletteHue">Hue</label><input id="paletteHue" type="range" min="0" max="359" value="260"></div>
+    <div class="palette-line"><label id="paletteSatLabel" for="paletteSat">Saturation</label><input id="paletteSat" type="range" min="0" max="100" value="65"></div>
+    <div class="palette-line"><label id="paletteLightLabel" for="paletteLight">Brightness</label><input id="paletteLight" type="range" min="0" max="100" value="50"></div>
+    <div class="palette-line"><div class="palette-preview" id="palettePreview"></div><input type="text" id="paletteHex" class="palette-hex" inputmode="text" maxlength="7" aria-label="HEX color" value="#7a3fc0"><input type="color" id="paletteNative" value="#7a3fc0" aria-label="System color picker"><span id="paletteNativeHint" class="notehint">HEX / system picker</span></div>
+    <div class="palette-footer"><button type="button" class="btn" id="paletteCancel">Cancel</button><button type="button" class="btn primary" id="paletteApply">Apply color</button></div>
+  </div>
+</div>
 <div id="toast" role="status" aria-live="polite"></div>
 </div>
 
@@ -358,7 +388,7 @@ button{touch-action:manipulation;cursor:pointer}
 (() => {
 "use strict";
 /* ================= constants & helpers ================= */
-const W=1000, A4H=1414, MM=W/210;
+const W=1000, A4H=1414, MM=W/210, NOTE_STEP=Math.round(A4H/3);
 const PAPER_KEYS=["grid","lined","dots","mm","iso","cornell","blank"];
 const PAPERS_L=()=>PAPER_KEYS.map(k=>[k,tt("paper_"+k)]);
 const PEN_COLORS=["#1b1f27","#2348c9","#cf3a2c","#1d8a4b"];
@@ -368,7 +398,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v14";
+const APP_VER="v15";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -1094,24 +1124,32 @@ function buildPages(){
   for(const k in OV) clearOverlay(k);
   pagesEl.innerHTML="";
   const n=S.pages.length;
+  if(S.pages[0]&&S.pages[0].bg){
+    pagesEl.append(h("button",{type:"button",class:"insertnote",onclick:()=>addPageAt(0,true)},"＋ "+shortNoteLabel()+" · "+tt("earlier")));
+  }
   S.pages.forEach((pg,i)=>{
     const el=h("div",{class:"page"}); el.style.aspectRatio=W+" / "+pageH(pg); el._pg=pg; pg.el=el; pg.cv=null; pg.ctx=null; pg.view=null;
     const star=h("button",{type:"button",class:"star","aria-pressed":String(!!pg.star),title:tt("bookmark"),"aria-label":tt("bookmark")},pg.star?"★":"☆");
     star.onclick=()=>setPageProp(pg,"star",pg.star?0:1);
     const acts=h("div",{class:"acts"},star);
     if(!pg.bg){ const sel=h("select",{"aria-label":tt("pagePaper")}); for(const [k,l] of PAPERS_L()) sel.append(h("option",{value:k},l)); sel.value=pagePaper(pg); sel.onchange=()=>setPageProp(pg,"paper",sel.value); acts.append(sel); }
+    acts.append(h("button",{type:"button",onclick:()=>notesAfter(pg),title:shortNoteLabel()},"＋ "+shortNoteLabel()));
     acts.append(h("button",{type:"button",onclick:()=>duplicatePage(pg)},tt("dupShort")));
     const del=h("button",{type:"button"},tt("del"));
     del.onclick=()=>{ if(S.pages.length<2){ toast(tt("lastPage")); return; } if(!del.classList.contains("warn")){ del.classList.add("warn"); del.textContent=tt("reallyDelete"); setTimeout(()=>{ if(del.isConnected){ del.classList.remove("warn"); del.textContent=tt("del"); } },4000); return; } deletePage(pg); };
     acts.append(del);
     const foot=h("div",{class:"pfoot"},h("span",{text:tf("pageOf",i+1,n)+(pg.bg?" · PDF":"")}),acts);
     pagesEl.append(h("div",{class:"sheet"},el,foot));
+    if(i<n-1) pagesEl.append(h("button",{type:"button",class:"insertnote",onclick:()=>notesAfter(pg)},"＋ "+shortNoteLabel()));
   });
-  pagesEl.append(h("button",{type:"button",class:"addpage",onclick:()=>addPageAt(S.pages.length,true)},tt("addPage")));
+  pagesEl.append(h("button",{type:"button",class:"addpage",onclick:()=>addPageAt(S.pages.length,true)},"＋ "+shortNoteLabel()));
   layoutZoom();
   for(const pg of S.pages) io.observe(pg.el);
 }
 function newPage(){ return {id:uid(),strokes:[]}; }
+function shortNoteLabel(){ return "⅓ A4 · "+tt("paper_grid"); }
+function newNotePage(){ return {id:uid(),strokes:[],h:NOTE_STEP,noteGrow:1,paper:"grid"}; }
+function notesAfter(pg){ const i=S.pages.indexOf(pg); if(i>=0) addPageAt(i+1,true); }
 function setPlist(list,record){
   const before=S.pages.slice(), prev=new Set(before), next=new Set(list);
   for(const pg of list) if(!prev.has(pg)) dirty.add(pg);
@@ -1120,8 +1158,8 @@ function setPlist(list,record){
   if(record) pushUndo({k:"plist",before,after:S.pages.slice()});
   buildPages(); scheduleSave(); if(!$("pv").hidden) renderPV();
 }
-function addPageAt(i,scroll){ const pg=newPage(); const l=S.pages.slice(); l.splice(i,0,pg); setPlist(l,true); if(scroll) requestAnimationFrame(()=>pg.el&&pg.el.scrollIntoView({block:"start"})); return pg; }
-function duplicatePage(pg){ const np={id:uid(),strokes:pg.strokes.map(cloneItem),h:pg.h,bg:pg.bg,paper:pg.paper,mmw:pg.mmw}; const l=S.pages.slice(); l.splice(l.indexOf(pg)+1,0,np); setPlist(l,true); toast(tt("pageDuplicated")); }
+function addPageAt(i,scroll){ const pg=newNotePage(); const l=S.pages.slice(); l.splice(i,0,pg); setPlist(l,true); if(scroll) requestAnimationFrame(()=>pg.el&&pg.el.scrollIntoView({block:"start"})); return pg; }
+function duplicatePage(pg){ const np={id:uid(),strokes:pg.strokes.map(cloneItem),h:pg.h,bg:pg.bg,paper:pg.paper,mmw:pg.mmw,noteGrow:pg.noteGrow}; const l=S.pages.slice(); l.splice(l.indexOf(pg)+1,0,np); setPlist(l,true); toast(tt("pageDuplicated")); }
 function deletePage(pg){ const l=S.pages.filter(p=>p!==pg); setPlist(l,true); toast(tt("pageDeleted")); }
 function movePage(pg,dir){ const l=S.pages.slice(), i=l.indexOf(pg), j=i+dir; if(j<0||j>=l.length) return; l.splice(i,1); l.splice(j,0,pg); setPlist(l,true); }
 function setPageProp(pg,key,val){ const before=pg[key]; if(before===val) return; pushUndo({k:"pprop",pid:pg.id,key,before,after:val}); applyPageProp(pg,key,val); }
@@ -1149,13 +1187,76 @@ async function openNb(m,fresh){
 $("backBtn").onclick=async ()=>{ finishText(); closePop(); clearSel(); await flush(); io.disconnect(); nearPages.clear(); for(const pg of S.pages) releaseCanvas(pg); for(const k in OV) clearOverlay(k); pagesEl.innerHTML=""; S.nb=null; S.pages=[]; $("nb").hidden=true; $("pv").hidden=true; $("lib").hidden=false; renderLib(); window.scrollTo(0,0); };
 
 /* ---------- toolbar ---------- */
+/* The advanced picker is a normal DOM dialog, not a hidden native color input.
+   Swatches, H/S/L sliders, and HEX work in iPad Safari regardless of OS picker support. */
+const COLOR_TEXT={
+  ru:["Палитра цветов","Оттенок","Насыщенность","Яркость","Отмена","Применить","Системный выбор"],
+  uk:["Палітра кольорів","Відтінок","Насиченість","Яскравість","Скасувати","Застосувати","Системний вибір"],
+  de:["Farbpalette","Farbton","Sättigung","Helligkeit","Abbrechen","Anwenden","Systemfarben"],
+  en:["Color palette","Hue","Saturation","Lightness","Cancel","Apply color","System picker"]
+};
+let colorCallback=null;
+function hslToHex(hue,sat,light){
+  const s=sat/100,l=light/100,a=s*Math.min(l,1-l),f=n=>{
+    const k=(n+hue/30)%12,c=l-a*Math.max(-1,Math.min(k-3,9-k,1));
+    return Math.round(255*c).toString(16).padStart(2,"0");
+  };
+  return "#"+f(0)+f(8)+f(4);
+}
+function hexToHsl(hex){
+  const v=hex.replace("#",""); const r=parseInt(v.slice(0,2),16)/255,g=parseInt(v.slice(2,4),16)/255,b=parseInt(v.slice(4,6),16)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn, l=(mx+mn)/2;
+  let hue=0,sat=0;
+  if(d){ sat=d/(1-Math.abs(2*l-1)); switch(mx){ case r:hue=((g-b)/d)%6;break; case g:hue=(b-r)/d+2;break; default:hue=(r-g)/d+4; } hue=(hue*60+360)%360; }
+  return [Math.round(hue),Math.round(sat*100),Math.round(l*100)];
+}
+function normalizeHex(val){
+  let s=String(val||"").trim(); if(/^[a-f\d]{3}$/i.test(s)) s=s.split("").map(x=>x+x).join("");
+  if(/^#[a-f\d]{3}$/i.test(s)) s=s.slice(1).split("").map(x=>x+x).join("");
+  if(!s.startsWith("#")) s="#"+s;
+  return /^#[a-f\d]{6}$/i.test(s)?s.toLowerCase():null;
+}
+function rememberCustomColor(c){
+  S.custom=[c].concat((S.custom||[]).filter(x=>x!==c)).slice(0,10); savePrefs();
+}
+function paletteButton(cur,callback){
+  const add=h("button",{type:"button",class:"sw add",title:tt("customColor"),"aria-label":tt("customColor")},h("i"));
+  add.onclick=(e)=>{ e.stopPropagation(); openColorPalette(cur,callback); };
+  return add;
+}
+function closeColorPalette(){ $("paletteModal").hidden=true; colorCallback=null; }
+function openColorPalette(cur,callback){
+  colorCallback=callback;
+  const labels=COLOR_TEXT[LANG]||COLOR_TEXT.en;
+  ["paletteTitle","paletteHueLabel","paletteSatLabel","paletteLightLabel","paletteCancel","paletteApply","paletteNativeHint"].forEach((id,i)=>$(id).textContent=labels[i]);
+  const preset=$("paletteGrid"); preset.replaceChildren();
+  const base=["#ffffff","#000000","#808080","#d4d4d4","#803f00","#efb69d","#7597b0","#424f66","#d01818","#fcac2e","#3cb56f","#2951d0"];
+  const colors=base.slice();
+  for(const light of [30,45,60,75,90]) for(let h0=0;h0<360;h0+=30) colors.push(hslToHex(h0,light===90?65:95,light));
+  for(const c of colors){ const btn=h("button",{type:"button",title:c,"aria-label":tt("colorSp")+c}); btn.style.setProperty("--sample",c); btn.onclick=()=>{ const cb=colorCallback; closeColorPalette(); if(cb) cb(c); }; preset.append(btn); }
+  const hex=normalizeHex(cur)||"#2747c4";
+  const hsl=hexToHsl(hex);
+  ["paletteHue","paletteSat","paletteLight"].forEach((id,i)=>$(id).value=hsl[i]);
+  setPalettePreview(hex);
+  $("paletteModal").hidden=false;
+  $("paletteHex").focus();
+}
+function setPalettePreview(hex){ $("palettePreview").style.background=hex; $("paletteHex").value=hex; $("paletteNative").value=hex; }
+function onPaletteSliders(){ const color=hslToHex(+(""+$("paletteHue").value),+(""+$("paletteSat").value),+(""+$("paletteLight").value)); setPalettePreview(color); }
+["paletteHue","paletteSat","paletteLight"].forEach(id=>$(id).addEventListener("input",onPaletteSliders));
+$("paletteHex").addEventListener("input",()=>{ const c=normalizeHex($("paletteHex").value); if(c){ $("palettePreview").style.background=c; $("paletteNative").value=c; const hsl=hexToHsl(c); ["paletteHue","paletteSat","paletteLight"].forEach((id,i)=>$(id).value=hsl[i]); } });
+$("paletteNative").addEventListener("input",()=>{ const c=$("paletteNative").value; setPalettePreview(c); const hsl=hexToHsl(c); ["paletteHue","paletteSat","paletteLight"].forEach((id,i)=>$(id).value=hsl[i]); });
+$("paletteApply").onclick=()=>{ const c=normalizeHex($("paletteHex").value); if(!c){ $("paletteHex").focus(); return; } const cb=colorCallback; closeColorPalette(); if(cb) cb(c); };
+$("paletteCancel").onclick=closeColorPalette;
+$("paletteClose").onclick=closeColorPalette;
+$("paletteModal").addEventListener("click",e=>{ if(e.target===$("paletteModal")) closeColorPalette(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("paletteModal").hidden){ e.preventDefault(); closeColorPalette(); } });
 function colorRow(kind){
   const box=h("span",{class:"grp"});
   const base=kind==="hl"?HL_COLORS:PEN_COLORS, list=base.concat(S.custom||[]), cur=kind==="hl"?S.hlColor:S.penColor;
   for(const c of list){ const b=h("button",{type:"button",class:"sw","aria-label":tt("colorSp")+c,"aria-pressed":String(c===cur)},h("i")); b.style.setProperty("--c",c); b.onclick=()=>{ if(kind==="hl") S.hlColor=c; else S.penColor=c; savePrefs(); renderOpts(); }; box.append(b); }
-  const add=h("button",{type:"button",class:"sw add",title:tt("customColor"),"aria-label":tt("customColor")},h("i"));
-  add.onclick=()=>{ const p=$("colorPick"); p.value=cur; p.onchange=()=>{ const c=p.value; S.custom=[c].concat((S.custom||[]).filter(x=>x!==c)).slice(0,6); if(kind==="hl") S.hlColor=c; else S.penColor=c; savePrefs(); renderOpts(); }; p.click(); };
-  box.append(add); return box;
+  box.append(paletteButton(cur,c=>{ rememberCustomColor(c); if(kind==="hl") S.hlColor=c; else S.penColor=c; savePrefs(); renderOpts(); }));
+  return box;
 }
 function widthRow(kind){
   const box=h("span",{class:"grp"}), cur=kind==="hl"?S.hlW:S.penW;
@@ -1236,7 +1337,26 @@ function endlessScrollGrow(){
   const add=Math.max(GROW_PAD,Math.ceil(ch*1.5/k/GROW_PAD)*GROW_PAD);
   last.h=pageH(last)+add; metaDirty=true; last.el.style.aspectRatio=W+" / "+last.h; if(last.cv) updateRegion(last,true); scheduleSave();
 }
+function noteLineStep(pg){
+  const pp=pagePaper(pg);
+  return (pp==="lined"||pp==="cornell")?8*MM:(pp==="mm"?5*MM:5*MM);
+}
+function extendNote(pg,bottom){
+  if(!pg||!pg.noteGrow||pg.bg) return;
+  let need=pageH(pg), threshold=2*noteLineStep(pg);
+  if(!Number.isFinite(bottom)) return;
+  while(bottom>=need-threshold) need+=NOTE_STEP;
+  if(need!==pageH(pg)){
+    pg.h=need; metaDirty=true;
+    if(pg.el){ pg.el.style.aspectRatio=W+" / "+need; if(pg.cv) updateRegion(pg,true); }
+    scheduleSave();
+  }
+}
 function autoGrow(pg,shrink){
+  if(pg.noteGrow&&!pg.bg){
+    extendNote(pg,contentBottom(pg));
+    return;
+  }
   if(!growsAuto(pg)) return;
   const need=Math.max(A4H,Math.ceil((contentBottom(pg)+GROW_PAD)/GROW_PAD)*GROW_PAD), cur=pageH(pg);
   if(need>cur+.5||(shrink&&need<cur-.5)){
@@ -1456,7 +1576,7 @@ function recognize(stroke,pg){
 
 /* ================= input ================= */
 let act=null, liveRaf=0;
-function localPt(e,rect,pg){ return [(e.clientX-rect.left)/rect.width*W,(e.clientY-rect.top)/rect.height*pageH(pg)]; }
+function localPt(e,rect,pg){ return [(e.clientX-rect.left)/rect.width*W,(e.clientY-rect.top)/rect.width*W]; }
 function tolU(a){ return 11/(a.rect.width/W); }
 function hitShape(pg,x,y,r){ for(let i=pg.strokes.length-1;i>=0;i--){ const it=pg.strokes[i]; if((isLine(it)||"orgadq".indexOf(it.t)>=0)&&hitItem(it,x,y,r)) return it; } return null; }
 function hitAny(pg,x,y,r,types){ for(let i=pg.strokes.length-1;i>=0;i--){ const it=pg.strokes[i]; if(types&&types.indexOf(it.t)<0) continue; if(hitItem(it,x,y,r)) return it; } return null; }
@@ -1571,6 +1691,7 @@ function addStrokePt(a,e){
   const pr=e.pointerType==="pen"?(e.pressure>0?e.pressure:.5):.5;
   if(n>=3){ const dx=x-p[n-3], dy=y-p[n-2]; if(dx*dx+dy*dy<.6) return; }
   p.push(Math.round(x*2)/2,Math.round(y*2)/2,Math.round(pr*15)/15);
+  extendNote(a.pg,y);
   if(Math.hypot(x-a.anchor[0],y-a.anchor[1])>3){ a.anchor=[x,y]; armHold(a); }
 }
 function armHold(a){ clearTimeout(a.holdT); if(!S.autoShape&&S.tool!=="hl") return; a.holdT=setTimeout(()=>{ if(act!==a||a.rec) return; const r=recognize(a.stroke,a.pg); if(r){ a.rec=r; vibrate(); drawLive(); } },520); }
@@ -1896,6 +2017,7 @@ function showSelection(){
   selMenu.innerHTML="";
   const items=S.sel.items, single=items.length===1?items[0]:null;
   if(items.some(it=>it.t!=="i")) for(const c of PEN_COLORS.concat(S.custom||[])){ const bt=h("button",{type:"button",class:"sw","aria-label":tt("colorSp")+c},h("i")); bt.style.setProperty("--c",c); bt.onclick=()=>selRecolor(c); selMenu.append(bt); }
+  if(items.some(it=>it.t!=="i")) selMenu.append(paletteButton(items[0].c||S.penColor, c=>{ rememberCustomColor(c); selRecolor(c); }));
   const btn=(t,fn,cls)=>h("button",{type:"button",class:"btn"+(cls?" "+cls:""),onclick:fn},t);
   if(single&&(isLine(single)||"orgadqx".indexOf(single.t)>=0)) selMenu.append(btn(tt("props"),()=>{ const r=selMenu.getBoundingClientRect(); const it=single; clearSel(); openPop(pg,it,r.left,r.bottom); }));
   if(single&&single.t==="x") selMenu.append(btn(tt("editText"),()=>{ const it=single; clearSel(); startText(pg,it); }));
@@ -1944,7 +2066,13 @@ function startText(pg,item,x,y){
   textEd={pg,orig:item,it,ta};
   if(item){ pg.hidden=new Set([item]); redraw(pg); }
   pg.el.append(ta); positionTextEd();
-  ta.addEventListener("input",positionTextEd);
+  ta.addEventListener("input",()=>{
+    positionTextEd();
+    if(pg.noteGrow){
+      const k=pg.el.getBoundingClientRect().width/W;
+      extendNote(pg,it.y+ta.scrollHeight/Math.max(k,.0001)*(it.fs*k<16?(it.fs*k/16):1));
+    }
+  });
   ta.addEventListener("blur",()=>{ setTimeout(()=>{ if(textEd&&textEd.ta===ta&&document.activeElement!==ta) finishText(); },120); });
   ta.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ e.preventDefault(); finishText(); } });
   ta.focus();
@@ -2009,7 +2137,7 @@ function buildPop(){
     row(h("button",{class:"btn",type:"button",onclick:()=>{ const p=pop; closePop(); startText(p.pg,p.pg.strokes[p.idx]); }},tt("editText")));
   }
   $("ipTitle").textContent=title;
-  if(it.t!=="i"){ const cs=h("span",{class:"grp"}); for(const c of PEN_COLORS.concat(S.custom||[])){ const b=h("button",{type:"button",class:"sw","aria-label":tt("colorSp")+c,"aria-pressed":String(c===it.c)},h("i")); b.style.setProperty("--c",c); b.onclick=()=>{ const n=cloneItem(pop.cur); n.c=c; popSet(n); buildPop(); }; cs.append(b); } row(cs); }
+  if(it.t!=="i"){ const cs=h("span",{class:"grp"}); for(const c of PEN_COLORS.concat(S.custom||[])){ const b=h("button",{type:"button",class:"sw","aria-label":tt("colorSp")+c,"aria-pressed":String(c===it.c)},h("i")); b.style.setProperty("--c",c); b.onclick=()=>{ const n=cloneItem(pop.cur); n.c=c; popSet(n); buildPop(); }; cs.append(b); } cs.append(paletteButton(it.c||S.penColor,c=>{ rememberCustomColor(c); if(!pop) return; const n=cloneItem(pop.cur); n.c=c; popSet(n); buildPop(); })); row(cs); }
   if(it.t!=="x"&&it.t!=="i"){ const ws=h("span",{class:"grp"}); [5,8,12].forEach((px,k)=>{ const b=h("button",{type:"button",class:"wd","aria-label":tt("thickSp")+(k+1),"aria-pressed":String(PEN_W[k]===it.w)},h("i",{style:"width:"+px+"px;height:"+px+"px"})); b.onclick=()=>{ const n=cloneItem(pop.cur); n.w=PEN_W[k]; popSet(n); buildPop(); }; ws.append(b); }); row(ws); }
 }
 function refreshPopFields(){ const it=pop&&pop.cur; if(!it) return; if(isLine(it)||isArrowLine(it)){ const g=lineGeom(it); $("ipLen").value=fmt1(g.cm,2); $("ipAng").value=fmt1(g.deg,1); } }
@@ -2028,8 +2156,8 @@ const BAD_FILE=tt("badFile");
 // Documents (PDF, GoodNotes, scans) always go after the last page that has something on it -
 // empty writing pages at the end stay at the end, and there is always a page to write on after the document.
 function docAt(l){ l=l||S.pages; let at=l.length; while(at>0&&!l[at-1].bg&&!(l[at-1].strokes||[]).length) at--; return at; }
-function withWritingTail(l){ if(!l.length||l[l.length-1].bg) l.push(newPage()); return l; }
-function insertPagesHere(made){ const l=S.pages.slice(), at=docAt(l); l.splice(at,0,...made); setPlist(withWritingTail(l),true); }
+function withWritingTail(l){ if(!l.length||l[l.length-1].bg) l.push(newNotePage()); return l; }
+function insertPagesHere(made){ const l=S.pages.slice(), cur=currentPage(), at=cur?l.indexOf(cur)+1:docAt(l); l.splice(Math.max(0,at),0,...made); setPlist(withWritingTail(l),true); }
 async function importInto(f,kind){ if(kind==="pdf") await importPDF(f,S.nb); else await importGoodnotes(f,S.nb); }
 
 /* ---- QR codes on photos and scans ---- */
@@ -2369,7 +2497,7 @@ function renderPV(){
     const star=h("button",{type:"button",class:"star","aria-pressed":String(!!pg.star),"aria-label":tt("bookmark"),onclick:()=>setPageProp(pg,"star",pg.star?0:1)},pg.star?"★":"☆");
     const del=h("button",{type:"button"},tt("del"));
     del.onclick=()=>{ if(S.pages.length<2){ toast(tt("lastPage")); return; } if(!del.classList.contains("warn")){ del.classList.add("warn"); del.textContent=tt("sure"); return; } deletePage(pg); };
-    grid.append(h("div",{class:"pvcard"},cv,h("div",{class:"pvn"},h("span",{text:String(i+1)}),star),h("div",{class:"pvb"},h("button",{type:"button","aria-label":tt("earlier"),onclick:()=>movePage(pg,-1)},"◀"),h("button",{type:"button","aria-label":tt("later"),onclick:()=>movePage(pg,1)},"▶"),h("button",{type:"button",onclick:()=>duplicatePage(pg)},tt("dupShort")),del)));
+    grid.append(h("div",{class:"pvcard"},cv,h("div",{class:"pvn"},h("span",{text:String(i+1)}),star),h("div",{class:"pvb"},h("button",{type:"button","aria-label":tt("earlier"),onclick:()=>movePage(pg,-1)},"◀"),h("button",{type:"button","aria-label":tt("later"),onclick:()=>movePage(pg,1)},"▶"),h("button",{type:"button",onclick:()=>notesAfter(pg)},"＋ "+shortNoteLabel()),h("button",{type:"button",onclick:()=>duplicatePage(pg)},tt("dupShort")),del)));
   });
   renderPVThumbs();
 }
@@ -2542,7 +2670,7 @@ async function importGoodnotes(file,target){
   for(const d of docs.values()) try{ d&&d.pdf&&d.pdf.destroy&&d.pdf.destroy(); }catch(e){}
   const after=()=>{ if(ink) setTimeout(()=>toast(tt("gnInk")),2600); };
   if(target&&S.nb===target){ insertPagesHere(made); toast(tt("gnImported")+made.length); after(); requestAnimationFrame(()=>made[0].el&&made[0].el.scrollIntoView({block:"start"})); return; }
-  const pinfo={}; for(const pg of made){ const o={}; if(pg.h&&pg.h!==A4H) o.h=pg.h; if(pg.bg) o.bg=pg.bg; if(pg.mmw) o.mmw=pg.mmw; if(Object.keys(o).length) pinfo[pg.id]=o; }
+  const pinfo={}; for(const pg of made){ const o={}; if(pg.h&&pg.h!==A4H) o.h=pg.h; if(pg.bg) o.bg=pg.bg; if(pg.mmw) o.mmw=pg.mmw; if(pg.noteGrow) o.noteGrow=1; if(Object.keys(o).length) pinfo[pg.id]=o; }
   const m={id:uid(),title:g.title||file.name.replace(/\.goodnotes$/i,"")||"GoodNotes",paper:"grid",created:Date.now(),updated:Date.now(),pages:made.map(p=>p.id),pinfo,thumb,spine:SPINES[books.length%SPINES.length],folder:S.folder||"",texts:"",refs:made.filter(p=>p.bg).map(p=>p.bg)};
   try{ for(const pg of made) await store.savePage(m.id,pg.id,[]); await store.saveMeta(m); }catch(err){ toast(tt("gnFailed")); return; }
   books.push(m); renderLib(); toast(tt("gnImported")+made.length); after(); openNb(m);
@@ -2563,7 +2691,7 @@ async function flush(){
       for(const pg of pages){ if(S.pages.includes(pg)) await store.savePage(nb.id,pg.id,pg.strokes.map(encItem)); }
       if(pages.includes(S.pages[0])||md||!nb.thumb) nb.thumb=await makeThumb(S.pages[0]);
       const pinfo={}, refs=new Set(), texts=[];
-      for(const pg of S.pages){ const o={}; if(pg.h&&pg.h!==A4H) o.h=pg.h; if(pg.bg){ o.bg=pg.bg; refs.add(pg.bg); } if(pg.paper) o.paper=pg.paper; if(pg.star) o.star=1; if(pg.mmw) o.mmw=pg.mmw; if(Object.keys(o).length) pinfo[pg.id]=o; for(const it of pg.strokes){ if(it.t==="i") refs.add(it.ref); else if(it.t==="x") texts.push(it.text); } }
+      for(const pg of S.pages){ const o={}; if(pg.h&&pg.h!==A4H) o.h=pg.h; if(pg.bg){ o.bg=pg.bg; refs.add(pg.bg); } if(pg.paper) o.paper=pg.paper; if(pg.star) o.star=1; if(pg.mmw) o.mmw=pg.mmw; if(pg.noteGrow) o.noteGrow=1; if(Object.keys(o).length) pinfo[pg.id]=o; for(const it of pg.strokes){ if(it.t==="i") refs.add(it.ref); else if(it.t==="x") texts.push(it.text); } }
       nb.pinfo=pinfo; nb.refs=[...refs]; nb.texts=texts.join(" ").slice(0,4000);
       nb.pages=S.pages.map(p=>p.id); nb.updated=Date.now();
       await store.saveMeta(nb);
@@ -2589,12 +2717,15 @@ $("pdfBtn").onclick=async ()=>{
     await ensureImages(S.pages);
     let doc=null; const c=document.createElement("canvas"), x=c.getContext("2d");
     for(const pg of S.pages){
-      if(growsAuto(pg)&&pageH(pg)>A4H+1){
-        const n=Math.max(1,Math.ceil((contentBottom(pg)+5*MM)/A4H));
+      if((growsAuto(pg)||pg.noteGrow)&&pageH(pg)>A4H+1){
+        const fullH=pg.noteGrow?pageH(pg):Math.max(1,contentBottom(pg)+5*MM);
+        const n=Math.max(1,Math.ceil(fullH/A4H));
         for(let k=0;k<n;k++){
-          c.width=1240; c.height=Math.round(1240*A4H/W); x.setTransform(1.24,0,0,1.24,0,-1.24*k*A4H); renderPage(x,pg,[0,k*A4H,W,(k+1)*A4H]);
-          if(!doc) doc=new J({unit:"mm",format:[210,297],orientation:"p",compress:true}); else doc.addPage([210,297],"p");
-          doc.addImage(c.toDataURL("image/jpeg",.9),"JPEG",0,0,210,297);
+          const chunkH=Math.min(A4H,fullH-k*A4H), hmm=210*chunkH/W;
+          c.width=1240; c.height=Math.round(1240*chunkH/W);
+          x.setTransform(1.24,0,0,1.24,0,-1.24*k*A4H); renderPage(x,pg,[0,k*A4H,W,k*A4H+chunkH]);
+          if(!doc) doc=new J({unit:"mm",format:[210,hmm],orientation:"p",compress:true}); else doc.addPage([210,hmm],"p");
+          doc.addImage(c.toDataURL("image/jpeg",.9),"JPEG",0,0,210,hmm);
         }
         continue;
       }

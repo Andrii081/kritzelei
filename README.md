@@ -9,6 +9,12 @@
 2. Tap **Share** → **Add to Home Screen** → **Add**.
 3. Start Kritzelei once from the new icon while you are online. After that it also works offline.
 
+## New in v15
+- Insert short **⅓ A4** notes sections between original PDF pages using the insertion controls or page overview.
+- Notes sections grow by ⅓ A4 when writing reaches the penultimate grid/ruled line. Supports Apple Pencil and text; saved automatically.
+- Built-in palette has 72 swatches, HSL sliders, HEX entry, and an optional native picker. Works on iPad without relying on Safari opening a hidden input.
+- Inserts preserve page order in exports and backups.
+
 ## Features
 - Notebooks with folders and search; paper: grid, lined, dots, graph paper, isometric, Cornell, blank
 - **Endless page** that grows while you write — or classic A4 pages, your choice for every notebook
