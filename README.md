@@ -15,6 +15,11 @@
 - Built-in palette has 72 swatches, HSL sliders, HEX entry, and an optional native picker. Works on iPad without relying on Safari opening a hidden input.
 - Inserts preserve page order in exports and backups.
 
+## Update v16 — iPad stylus calculator fix
+- The calculator now detects Apple Pencil contacts directly, including fast repeated taps on numbers, operators, cursor arrows and history.
+- Prevents duplicate inputs from a synthetic click following a Pencil contact. Finger, mouse and keyboard input remain supported.
+- Includes all v15 improvements: insert short grid sheets between PDF pages, auto-grow by 1/3 A4 and custom color palette.
+
 ## Features
 - Notebooks with folders and search; paper: grid, lined, dots, graph paper, isometric, Cornell, blank
 - **Endless page** that grows while you write — or classic A4 pages, your choice for every notebook

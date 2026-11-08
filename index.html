@@ -209,7 +209,7 @@ button{touch-action:manipulation;cursor:pointer}
 .calcres{font-size:28px;font-weight:600;text-align:right;min-height:36px;overflow-x:auto;white-space:nowrap}
 .calcres.live{color:var(--muted)}
 .calckeys{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
-.calckeys button{height:40px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:17px;font-weight:500;color:inherit;touch-action:manipulation;padding:0}
+.calckeys button{height:44px;min-width:0;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:17px;font-weight:500;color:inherit;touch-action:manipulation;padding:0;-webkit-touch-callout:none}
 .calckeys button.fn{font-size:14px}
 .calckeys button.op{font-size:20px;color:var(--accent)}
 .calckeys button.eq,.calckeys button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -398,7 +398,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v15";
+const APP_VER="v16";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -1416,12 +1416,49 @@ function calcFmt(v){ if(!Number.isFinite(v)) return null; let r=Number(v.toPreci
 const calcShow=(e)=>e.replace(/a(sin|cos|tan)\(/g,"$1⁻¹(").replace(/\./g,calcSep());
 const CALC_KEYS=[["deg","fn"],["2nd","fn"],["(","fn"],[")","fn"],["C","fn"],["sin","fn"],["cos","fn"],["tan","fn"],["^","op"],["⌫","fn"],
   ["√","fn"],["7"],["8"],["9"],["÷","op"],["x²","fn"],["4"],["5"],["6"],["×","op"],["π","fn"],["1"],["2"],["3"],["−","op"],["Ans","fn"],["0"],["."],["=","eq"],["+","op"]];
+/* Calculator button taps on iPad: Pencil is processed on pointerdown instead of relying
+   on Safari generating a click after a pen contact. Finger, mouse and keyboard keep
+   their native click behavior. A click synthesized after Pencil input is ignored,
+   so one physical tap never enters a character twice. */
+function calcTap(el, activate){
+  let lastPencilAt=-Infinity, lastPointerType="";
+  const pencil=(e)=>{
+    const now=performance.now();
+    // iOS may report the very same Pencil contact as pointerdown + touchstart.
+    if(now-lastPencilAt<65) return;
+    lastPencilAt=now;
+    activate(e);
+  };
+  el.addEventListener("pointerdown",(e)=>{
+    lastPointerType=e.pointerType||"";
+    if(e.pointerType!=="pen"||e.button!==0||e.isPrimary===false) return;
+    e.preventDefault();
+    pencil(e);
+  },{passive:false});
+  // Fallback for older iPad Safari versions that expose a stylus as Touch.touchType.
+  el.addEventListener("touchstart",(e)=>{
+    const stylus=Array.from(e.changedTouches).some(t=>t.touchType==="stylus");
+    if(!stylus){ if(lastPointerType!=="pen") lastPointerType="touch"; return; }
+    lastPointerType="pen";
+    e.preventDefault();
+    // TouchEvent has no clientX/clientY; the caret needs the stylus coordinates.
+    const t=Array.from(e.changedTouches).find(t=>t.touchType==="stylus");
+    pencil(t?{clientX:t.clientX,clientY:t.clientY}:e);
+  },{passive:false});
+  el.addEventListener("click",(e)=>{
+    if(lastPointerType==="pen"&&e.detail!==0&&performance.now()-lastPencilAt<950){
+      e.preventDefault(); // synthetic Pencil click after the already handled pointerdown
+      return;
+    }
+    activate(e); // finger, mouse, assistive click and keyboard (detail === 0)
+  });
+}
 function renderCalcKeys(){
   const box=$("calcKeys"); box.innerHTML="";
   for(const [k,cl] of CALC_KEYS){
     let lab=k; if(k==="deg") lab=S.calcDeg===false?"RAD":"DEG"; else if(k===".") lab=calcSep(); else if(calc.second&&(k==="sin"||k==="cos"||k==="tan")) lab=k+"⁻¹"; else if(calc.second&&k==="√") lab="ln"; else if(calc.second&&k==="x²") lab="log";
     const b=h("button",{type:"button",class:cl||null},lab); if(k==="2nd") b.setAttribute("aria-pressed",String(calc.second));
-    b.onclick=()=>calcPress(k); box.append(b);
+    calcTap(b,()=>calcPress(k)); box.append(b);
   }
 }
 function calcNum(v){ const a=Math.abs(v); let t=String(Number(a.toPrecision(12))); if(/e/.test(t)) t=a.toFixed(12).replace(/0+$/,"").replace(/\.$/,""); return v<0?"(−"+t+")":t; }
@@ -1488,10 +1525,10 @@ function calcRender(err){
   if(err) res=err; else if(c.done) res=calcFmt(c.ans); else if(c.expr){ try{ const r=calcFmt(calcEval(c.expr)); if(r!==null){ res=r; live=true; } }catch(e2){} }
   const el=$("calcRes"); el.textContent=res||(c.expr?"":"0"); el.classList.toggle("live",live);
   const hb=$("calcHist"); hb.innerHTML="";
-  for(const [x,v] of c.hist.slice(0,c.done?-1:undefined).slice(-3)){ const b=h("button",{type:"button"},calcShow(x)+" = "+calcFmt(v)); b.onclick=()=>calcInsert(v); hb.append(b); }
+  for(const [x,v] of c.hist.slice(0,c.done?-1:undefined).slice(-3)){ const b=h("button",{type:"button"},calcShow(x)+" = "+calcFmt(v)); calcTap(b,()=>calcInsert(v)); hb.append(b); }
 }
-$("calcExpr").addEventListener("click",(e)=>{ const c=calc, pos=calcCaretAt(e.clientX,e.clientY); calcEdit(); c.sel=null; c.cur=pos==null?c.expr.length:clamp(pos,0,c.expr.length); calcRender(); });
-$("calcL").onclick=()=>calcMove(-1); $("calcR").onclick=()=>calcMove(1);
+calcTap($("calcExpr"),(e)=>{ const c=calc, pos=calcCaretAt(e.clientX,e.clientY); calcEdit(); c.sel=null; c.cur=pos==null?c.expr.length:clamp(pos,0,c.expr.length); calcRender(); });
+calcTap($("calcL"),()=>calcMove(-1)); calcTap($("calcR"),()=>calcMove(1));
 function calcPlace(){
   const el=$("calc"); if(el.hidden) return; const w=el.offsetWidth, hh=el.offsetHeight; let p=S.calcPos;
   if(!p){ const bar=document.querySelector("#nb .bar").getBoundingClientRect(); p={x:innerWidth-w-16,y:bar.bottom+12}; }
