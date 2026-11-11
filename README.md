@@ -20,6 +20,13 @@
 - Prevents duplicate inputs from a synthetic click following a Pencil contact. Finger, mouse and keyboard input remain supported.
 - Includes all v15 improvements: insert short grid sheets between PDF pages, auto-grow by 1/3 A4 and custom color palette.
 
+## Update v17 — automatic handwriting and technical drawing (optional)
+- Select **Pen** → tick **Auto: writing / drawing** to enable geometry recognition on pen lift. Recognizes clearly drawn long straight lines, arcs, circles, rectangles, triangles and certain polylines; small, ambiguous or letter-like strokes remain handwriting.
+- Uncheck **Auto** to get exactly the v16 pen behavior (including the existing optional hold-to-straighten control).
+- The switch persists on the same device. It is **off by default** to preserve current workflows and existing documents.
+- Recognition is geometric, not AI handwriting OCR. Small or ambiguous shapes may need the dedicated Line / Shapes tools; use Undo if a mark is misclassified.
+- All existing v15-v16 fixes are retained.
+
 ## Features
 - Notebooks with folders and search; paper: grid, lined, dots, graph paper, isometric, Cornell, blank
 - **Endless page** that grows while you write — or classic A4 pages, your choice for every notebook
