@@ -119,3 +119,11 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - Supports the previous features for multi-page PDF notes, ⅓ A4 inserts, stylus calculator, color palette, natural handwriting and local backups.
 
 **Important:** Tesseract OCR remains a printed-text OCR engine, not a high-accuracy handwriting model. It is unable to guarantee reading badly formed letters/digits. The recognizer and bundled tests verify processing rules but not every user's handwriting. Test on the actual iPad/Apple Pencil and keep backup copies. Initial use of the OCR engine and font resources requires internet.
+
+## Update v24 — numbered X/Y coordinates and deliberate scratch erasing
+
+- X/Y axes now show **numbered ticks for every grid cell**, initially 1, 2, 3, etc., with negative values on the other halves.
+- **Hold a number for about half a second** to enter a positive step (e.g. 50); labels become 50, 100, 150... while every grid cell stays one tick. Both axes of the same cross update; the step persists in backups and PDF exports. Existing v23 coordinate crosses are upgraded on opening.
+- All **automatic handwriting OCR / character substitution has been disabled and its controls removed**. Original handwriting is left as ink. Previously transformed calligraphy objects remain visible and erasable.
+- The optional scribble-to-erase gesture requires a **single continuous stroke completed in at most one second** that intersects pre-existing ink at **four distinct points**. Only strokes with actual geometric intersections are erased, not nearby strokes within a broad area. One undo restores the erased objects. Independent drawing strokes cannot combine into an erasing gesture.
+- Grid axes and handwritten strokes remain editable using the existing tools.

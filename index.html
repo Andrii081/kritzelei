@@ -254,6 +254,13 @@ button{touch-action:manipulation;cursor:pointer}
 .callig-panel{width:min(520px,100%);background:var(--raise);color:var(--ink);border:1px solid var(--line);box-shadow:0 20px 65px rgba(0,0,0,.27);border-radius:16px;padding:18px;display:grid;gap:12px;box-sizing:border-box}
 .callig-panel label{font-weight:600}.callig-panel textarea{width:100%;min-height:72px;box-sizing:border-box;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:12px;resize:vertical;font-size:22px;touch-action:auto}
 .callig-panel .callig-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.callig-panel button{min-height:42px}
+
+/* v24: iPad Pencil-friendly axis scale editor */
+.axis-step-overlay{position:fixed;inset:0;z-index:16010;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(16,28,54,.44)}
+.axis-step-panel{width:min(420px,100%);box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--raise);padding:22px;box-shadow:0 15px 45px rgba(0,0,0,.24);display:grid;gap:10px}
+.axis-step-panel h3{margin:0;font-size:19px}.axis-step-panel p{margin:0 0 6px;color:var(--muted)}
+.axis-step-panel label{font-weight:600}.axis-step-panel input{width:100%;box-sizing:border-box;font-size:23px;border:1px solid var(--line);background:var(--surface);padding:12px;border-radius:9px}
+.axis-step-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -398,14 +405,6 @@ button{touch-action:manipulation;cursor:pointer}
 <div id="toast" role="status" aria-live="polite"></div>
 </div>
 
-<div id="calligReview" class="callig-review" hidden role="dialog" aria-modal="true" aria-labelledby="calligReviewTitle">
-  <div class="callig-panel">
-    <label id="calligReviewTitle" for="calligReviewText"></label>
-    <div id="calligReviewInfo" class="hint"></div>
-    <textarea id="calligReviewText" dir="auto" autocomplete="off" spellcheck="true"></textarea>
-    <div class="callig-actions"><button id="calligKeep" class="btn" type="button"></button><button id="calligApply" class="btn primary" type="button"></button></div>
-  </div>
-</div>
 
 <script>
 (() => {
@@ -421,7 +420,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v23";
+const APP_VER="v24";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -491,7 +490,7 @@ function applyI18n(){
   for(const a of ["title","aria-label","placeholder"]) for(const el of document.querySelectorAll("[data-i18n-"+a+"]")) el.setAttribute(a,tt(el.getAttribute("data-i18n-"+a)));
   for(const id of ["langSel","langSel2"]){ const sel=$(id); if(sel) sel.value=LANG; }
 }
-function setLang(l){ if(!I18N[l]||l===LANG) return; cancelCalligPending(); LANG=l; try{ localStorage.setItem("kritzelei.lang",l); }catch(e){} if(store&&store.setSetting) store.setSetting("lang",l).catch(()=>{}); refreshLang(); }
+function setLang(l){ if(!I18N[l]||l===LANG) return; LANG=l; try{ localStorage.setItem("kritzelei.lang",l); }catch(e){} if(store&&store.setSetting) store.setSetting("lang",l).catch(()=>{}); refreshLang(); }
 function refreshLang(){
   applyI18n(); segButtons($("newPaper"),PAPERS_L(),newPaper,k=>newPaper=k); renderNewLayout(); renderWhere(); renderLib();
   if(S.nb){ renderPaperSeg(); buildPages(); renderTools(); }
@@ -598,7 +597,11 @@ function bbox(it){
   }
   if(it.axisName&&(it.t==="p"||it.t==="b")){
     // Include arrow and coordinate label in redraws and hit testing.
-    const e=it.p||[]; if(e.length>=6){const x=e[e.length-3],y=e[e.length-2];b=[Math.min(b[0],x-30),Math.min(b[1],y-38),Math.max(b[2],x+65),Math.max(b[3],y+44)];}
+    const e=it.p||[];if(e.length>=6){const x=e[e.length-3],y=e[e.length-2];
+      b=[Math.min(b[0],x-42),Math.min(b[1],y-42),Math.max(b[2],x+65),Math.max(b[3],y+44)];
+      if(it.axisName==="x") {b[1]-=26;b[3]+=24;}
+      if(it.axisName==="y") {b[0]-=45;b[2]+=24;}
+    }
   }
   return (it._bb=b);
 }
@@ -747,6 +750,67 @@ function strokePaths(s){
   }
   s._pp=out; s._ppk=key; return out;
 }
+/* v24 axis scale. The numbered ticks are part of each X/Y axis item, so they
+   serialize, erase, export and undo together rather than drifting as text nodes. */
+const AXIS_FONT='600 14px "Rubik",system-ui,sans-serif';
+function axisGridCell(pg){
+  const paper=pagePaper(pg);
+  if(paper==="mm")return MM; // millimetre graph paper: one tiny square
+  if(paper==="lined"||paper==="cornell")return 8*MM;
+  return 5*MM;
+}
+function axisGeometry(it){
+  if(!it||!(["x","y"].includes(it.axisName))||!it.p||it.p.length!==6)return null;
+  const pp=it.p,cell=Number(it.axisCell)||5*MM,unit=(Number.isFinite(cell)&&cell>0)?cell:5*MM;
+  const origin=Array.isArray(it.axisOrigin)&&it.axisOrigin.length===2?it.axisOrigin:null;
+  if(!origin)return null;
+  const lo=it.axisName==="x"?Math.min(pp[0],pp[3]):Math.min(pp[1],pp[4]);
+  const hi=it.axisName==="x"?Math.max(pp[0],pp[3]):Math.max(pp[1],pp[4]);
+  const o=it.axisName==="x"?origin[0]:origin[1];
+  return {kind:it.axisName,o,origin,unit,lo,hi,step:Number(it.axisStep)>0?Number(it.axisStep):1};
+}
+function axisTicks(it,fn){
+  const a=axisGeometry(it);if(!a)return;
+  // Clip ticks to both ends of the drawn axis; avoid enormous loops for long pages.
+  const from=Math.max(-600,Math.ceil((a.lo-a.o)/a.unit-1e-5));
+  const to=Math.min(600,Math.floor((a.hi-a.o)/a.unit+1e-5));
+  for(let i=from;i<=to;i++){
+    if(!i)continue;
+    const n=a.kind==="x"?i:-i; // y is positive upwards
+    const x=a.kind==="x"?a.o+i*a.unit:a.origin[0];
+    const y=a.kind==="y"?a.o+i*a.unit:a.origin[1];
+    const val=Number((n*a.step).toPrecision(12));
+    const label=String(val).replace(".",DEC_COMMA.has(LANG)?",":".");
+    fn({x,y,n,value:val,label,kind:a.kind,unit:a.unit});
+  }
+}
+function drawAxisScale(ctx,s){
+  const a=axisGeometry(s);if(!a)return;
+  ctx.save();ctx.strokeStyle=s.c;ctx.fillStyle=s.c;
+  ctx.lineWidth=Math.max(1.3,Math.min(2.5,(s.w||2)*.55));
+  ctx.textBaseline="middle";ctx.font=AXIS_FONT;
+  axisTicks(s,t=>{
+    ctx.beginPath();
+    if(t.kind==="x"){
+      ctx.moveTo(t.x,t.y-5);ctx.lineTo(t.x,t.y+5);ctx.stroke();
+      // Numbers such as 100/150/-250 do not fit horizontally in a 5-mm cell.
+      // Tilt long labels, keeping every value visible without merging text.
+      if(t.label.length>2){
+        ctx.save();ctx.translate(t.x,t.y+11);ctx.rotate(-Math.PI/3);
+        ctx.textAlign="right";ctx.font='600 13px "Rubik",system-ui,sans-serif';
+        ctx.fillText(t.label,-1,1);ctx.restore();
+      }else{ctx.textAlign="center";ctx.fillText(t.label,t.x,t.y+16);}
+    }else{
+      ctx.moveTo(t.x-5,t.y);ctx.lineTo(t.x+5,t.y);ctx.stroke();
+      ctx.textAlign="right";ctx.fillText(t.label,t.x-9,t.y);
+    }
+  });
+  if(s.axisName==="x"){
+    ctx.textAlign="right";ctx.font='500 12px "Rubik",sans-serif';
+    ctx.fillText("0",a.origin[0]-7,a.origin[1]+14);
+  }
+  ctx.restore();
+}
 function drawStroke(ctx,s){
   const p=s.p, n=p.length/3; if(!n) return;
   ctx.save(); ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle=s.c; ctx.fillStyle=s.c;
@@ -763,6 +827,7 @@ function drawStroke(ctx,s){
       ctx.fillText(s.axisName,p[3]+(dx/L)*15+4,p[4]+(dy/L)*15-4);
     }
   }
+  if(s.axisName==="x"||s.axisName==="y")drawAxisScale(ctx,s);
   ctx.restore();
 }
 function arrowHead(ctx,x0,y0,x1,y1,L,Hh){ const a=Math.atan2(y1-y0,x1-x0); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1-Math.cos(a)*L+Math.sin(a)*Hh, y1-Math.sin(a)*L-Math.cos(a)*Hh); ctx.lineTo(x1-Math.cos(a)*L-Math.sin(a)*Hh, y1-Math.sin(a)*L+Math.cos(a)*Hh); ctx.closePath(); ctx.fill(); }
@@ -1042,13 +1107,18 @@ Object.assign(I18N.uk,{calligHint:"Рукописні літери та цифр
 Object.assign(I18N.en,{calligHint:"Cursive script for characters and numbers, keeping the chosen pen thickness. Ambiguous 0/O/D stays as ink instead of a wrong replacement."});
 Object.assign(I18N.de,{calligHint:"Schreibschrift für Buchstaben und Ziffern mit gleicher Stiftstärke. Zweifelhafte Zeichen wie 0/O/D bleiben unverändert."});
 
+/* v24: deliberately discontinue experimental OCR. Geometry stays; no automatic text substitution. */
+Object.assign(I18N.ru,{smartInkHint:"Прямые и оси X/Y/Z автоматически выравниваются по клеткам. На осях появляются деления и числа. Удерживай число около полсекунды, чтобы изменить шаг (например, с 1 на 50).",scratchEraseHint:"Один непрерывный жест не дольше 1 секунды: быстро зачеркни существующий рисунок не менее чем в 4 точках. Стираются только пересечённые элементы. Несвязанные штрихи не объединяются."});
+Object.assign(I18N.uk,{smartInkHint:"Осі X/Y отримують поділки та числа за клітинками. Утримуйте число, щоб змінити крок.",scratchEraseHint:"Одним жестом до 1 секунди перетніть намальоване щонайменше чотири рази. Стираються лише перетнуті об'єкти."});
+Object.assign(I18N.en,{smartInkHint:"Auto-snapped X/Y axes include one tick per grid cell. Long-press any number to change the value step.",scratchEraseHint:"In one continuous stroke lasting at most a second, cross existing ink at four distinct points. Only genuinely crossed objects are erased."});
+Object.assign(I18N.de,{smartInkHint:"X/Y-Achsen mit Teilstrichen pro Karofeld. Zahl gedrückt halten, um die Schrittweite zu ändern.",scratchEraseHint:"Mit einer schnellen durchgehenden Bewegung unter einer Sekunde bestehende Striche mindestens viermal kreuzen. Nur gekreuzte Objekte werden gelöscht."});
 /* v23: clarify experimental recognition and new always-erasable calligraphy. */
 Object.assign(I18N.ru,{calligHint:"Пишет красивые отдельные буквы и цифры (цифры — рукописным шрифтом). Сильно неровный почерк сначала сглаживается; сомнительное распознавание не удаляет исходную запись. Любую заменённую букву можно стереть обычным ластиком.",smartInkHint:"Две длинные линии, пересекающиеся как крест, превращаются в оси X/Y со стрелками и привязкой к сетке. Стрелочки, дорисованные в конце, допустимы."});
 Object.assign(I18N.uk,{calligHint:"Покращення окремих рукописних літер та цифр; ненадійні результати залишаються рукописними. Перетворені символи стираються звичайною гумкою."});
 Object.assign(I18N.en,{calligHint:"Beautify individual handwritten letters and digits, while keeping uncertain strokes. Recognized characters can be erased with the normal eraser."});
 Object.assign(I18N.de,{calligHint:"Einzelne handgeschriebene Buchstaben und Ziffern glätten. Unsichere Zeichen bleiben im Original. Die normale Radierfunktion entfernt auch erkannte Zeichen."});
 const S={calcPos:null,calcDeg:true,pick:null,snap:true,scanMode:"color",nb:null,pages:[],tool:"pen",penColor:PEN_COLORS[0],hlColor:HL_COLORS[0],penW:1,hlW:1,finger:false,penType:"pen",autoShape:true,smartInk:true,scratchErase:true,calligInk:false,custom:[],erMode:"whole",erSize:1,txtSize:1,shape:"circle",zoom:1,folder:"",query:"",undo:[],redo:[],lnLen:null,lnAng:null,fix:{dia:null,bw:null,bh:null},sel:null,clip:null,arc:null,baseW:880};
-const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","scratchErase","calligInk","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
+const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","scratchErase","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
 try{ const pref=JSON.parse(localStorage.getItem("kritzelei.prefs")||"{}"); for(const k of PREF_KEYS) if(pref[k]!==undefined) S[k]=pref[k]; }catch(e){}
 function savePrefs(){ try{ const o={}; for(const k of PREF_KEYS) o[k]=S[k]; localStorage.setItem("kritzelei.prefs",JSON.stringify(o)); }catch(e){} }
 const dirty=new Set(); let metaDirty=false, saveT=null, saving=false, saveAgain=false;
@@ -1341,6 +1411,8 @@ async function openNb(m,fresh){
   if(S.nb!==m) return;
   const pinfo=m.pinfo||{};
   S.pages=m.pages.map(id=>Object.assign({id,strokes:(stored[id]||[]).map(decItem).filter(Boolean)},pinfo[id]||{}));
+  for(const pg of S.pages)if(upgradeAxisLabels(pg))dirty.add(pg);
+  if(dirty.size)scheduleSave();
   if(!S.pages.length){ S.pages.push(newPage()); metaDirty=true; }
   for(const pg of S.pages) autoGrow(pg,true);
   $("endlessTog").checked=!!m.endless;
@@ -1471,8 +1543,6 @@ function renderOptsInner(o){
   if(t==="lasso"){
     o.append(h("button",{class:"btn sm",type:"button",onclick:()=>selectAllOnPage()},tt("selectPage")));
     const pb=h("button",{class:"btn sm",type:"button",onclick:()=>pasteClip()},tt("paste")); pb.disabled=!S.clip; o.append(pb);
-    const cb=h("button",{class:"btn sm",type:"button",onclick:()=>calligSelected()},tt("calligSelection"));
-    o.append(cb);
   }
   if(t==="pen"){
     const smart=h("input",{type:"checkbox",id:"smartInk", "aria-label":tt("smartInk")});
@@ -1483,11 +1553,6 @@ function renderOptsInner(o){
     scratch.checked=!!S.scratchErase;
     scratch.onchange=()=>{S.scratchErase=scratch.checked;savePrefs();renderOpts();};
     o.append(h("label",{class:"tog smart-mode",title:tt("scratchEraseHint")},scratch,tt("scratchErase")));
-    const cc=h("input",{type:"checkbox",id:"calligInk","aria-label":tt("calligInk")});
-    cc.checked=!!S.calligInk;
-    cc.onchange=()=>{ S.calligInk=cc.checked; if(!cc.checked) cancelCalligPending(); savePrefs(); renderOpts(); };
-    o.append(h("label",{class:"tog smart-mode",title:tt("calligHint")},cc,tt("calligInk")));
-    if(S.calligInk) o.append(h("span",{class:"hint"},tt("calligHint")));
     // Existing hold-to-straighten option remains unchanged when smart mode is off.
     if(!S.smartInk){ const cb=h("input",{type:"checkbox",id:"autoShape"}); cb.checked=!!S.autoShape; cb.onchange=()=>{ S.autoShape=cb.checked; savePrefs(); renderOpts(); }; o.append(h("label",{class:"tog"},cb,tt("straighten"))); }
   }
@@ -1802,234 +1867,8 @@ function recognize(stroke,pg){
    Joining cursive letters are kept as ink, because their divisions are not
    inferable reliably from geometrical stroke groups. This is *not* word OCR.
    All OCR runs on the device; first load of engine and a language needs internet. */
-const OCR_LANG={en:"eng",de:"deu",uk:"ukr",ru:"rus",pl:"pol",tr:"tur",es:"spa",fr:"fra",it:"ita",pt:"por",nl:"nld",ar:"ara",zh:"chi_sim",ja:"jpn",ko:"kor"};
-const OCR_LIB="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-let calligPending=null,calligTimer=0,calligJob=Promise.resolve(),ocrWorker=null,ocrWorkerLang=null,ocrScriptP=null,ocrBusy=false;
-function cancelCalligPending(){clearTimeout(calligTimer);calligTimer=0;calligPending=null;}
-function strokeInkBounds(items){let bb=[Infinity,Infinity,-Infinity,-Infinity];for(const it of items){const z=bbox(it);bb=[Math.min(bb[0],z[0]),Math.min(bb[1],z[1]),Math.max(bb[2],z[2]),Math.max(bb[3],z[3])];}return bb;}
-function beautifyInkStroke(it){
-  // A tiny regularization of hand movement; NEVER changes letter topology,
-  // removes strokes, or swaps characters. Keeps pressure data and endpoints.
-  const p=it.p||[],n=p.length/3;
-  if(n<4)return it;
-  const out=p.slice();
-  for(let i=1;i<n-1;i++){
-    const j=i*3;
-    const x=(p[j-3]+2*p[j]+p[j+3])/4,y=(p[j-2]+2*p[j+1]+p[j+4])/4;
-    // Caps displacement to preserve sharp joins such as Cyrillic Д or Chinese strokes.
-    const dx=x-p[j],dy=y-p[j+1],d=Math.hypot(dx,dy);
-    const v1x=p[j]-p[j-3],v1y=p[j+1]-p[j-2],v2x=p[j+3]-p[j],v2y=p[j+4]-p[j+1];
-    const c=(v1x*v2x+v1y*v2y)/Math.max(.01,Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y));
-    const cap=Math.min(c<.15?.35:c<.55?1.2:4.6,d),f=d?cap/d:0;
-    out[j]=Math.round((p[j]+dx*f)*10)/10;
-    out[j+1]=Math.round((p[j+1]+dy*f)*10)/10;
-    if(it.t==="p"){
-      const down=clamp((v1y+v2y)/(Math.hypot(v1x+v2x,v1y+v2y)+.01),-1,1);
-      out[j+2]=Math.round(clamp(.65*p[j+2]+.35*(.49+.18*down),.20,.95)*100)/100;
-    }
-  }
-  return {...it,p:out};
-}
-async function loadOCR(lang){
-  if(!window.Tesseract){if(!ocrScriptP)ocrScriptP=loadScript(OCR_LIB).catch(e=>{ocrScriptP=null;throw e;});await ocrScriptP;}
-  if(ocrWorker&&ocrWorkerLang===lang)return ocrWorker;
-  if(ocrWorker){try{await ocrWorker.terminate();}catch(e){}ocrWorker=null;ocrWorkerLang=null;}
-  ocrWorker=await window.Tesseract.createWorker(OCR_LANG[lang]||"eng",1,{cacheMethod:"write",logger:()=>{}});
-  ocrWorkerLang=lang;
-  if(ocrWorker.setParameters)await ocrWorker.setParameters({tessedit_pageseg_mode:"10",preserve_interword_spaces:"0"});
-  return ocrWorker;
-}
-function makeCalligImage(items){
-  const bb=strokeInkBounds(items),width=Math.max(2,bb[2]-bb[0]),height=Math.max(2,bb[3]-bb[1]),pad=24;
-  const scale=Math.min(4,1200/Math.max(width,height)),c=document.createElement("canvas");
-  c.width=Math.max(96,Math.ceil((width+2*pad)*scale));c.height=Math.max(96,Math.ceil((height+2*pad)*scale));
-  const ctx=c.getContext("2d",{willReadFrequently:true});
-  ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
-  ctx.setTransform(scale,0,0,scale,(pad-bb[0])*scale,(pad-bb[1])*scale);
-  for(const it of items)if(isFree(it)){const ink=cloneItem(it);ink.c="#070707";ink.w=Math.max(3.1,it.w||3);drawStroke(ctx,ink);}
-  return {image:c,bb};
-}
-function recognizedLanguageMatches(str,lang){
-  if(!str)return false;
-  const scripts={ru:/[А-Яа-яЁё]/,uk:/[А-Яа-яІіЇїЄєҐґ]/,ar:/[\u0600-\u06FF]/,zh:/[\u3400-\u9FFF]/,ja:/[\u3040-\u30FF\u3400-\u9FFF]/,ko:/[\uAC00-\uD7AF]/};
-  return scripts[lang]?scripts[lang].test(str):/[A-Za-zÀ-žİıĞğŞş]/.test(str);
-}
-function graphemes(s,lang){
-  const value=String(s||"").normalize("NFC");
-  if(typeof Intl!=="undefined"&&Intl.Segmenter)return [...new Intl.Segmenter(lang,{granularity:"grapheme"}).segment(value)].map(x=>x.segment);
-  return Array.from(value);
-}
-function oneGlyph(raw,lang){
-  // A single Unicode letter/ideograph or *ASCII digit* is a valid glyph.
-  // Reject OCR's accidental multi-character answer and punctuation.
-  const t=String(raw||"").trim().replace(/[\r\n\s]+/g,"");
-  const chars=graphemes(t,lang);
-  if(chars.length!==1)return "";
-  const c=chars[0];
-  if(/^[0-9]$/.test(c))return c;
-  if(!/^\p{L}[\p{L}\p{M}]*$/u.test(c))return "";
-  return recognizedLanguageMatches(c,lang)?c:"";
-}
-// OCR for printed documents cannot reliably distinguish a handwritten 0/O/D
-// (or Cyrillic О) from an isolated oval. Do not silently mislabel one.
-function isAmbiguousOval(group){
-  if(group.length!==1||!isFree(group[0]))return false;
-  const pts=inkPoints(group[0]);if(pts.length<5)return false;
-  const bb=strokeInkBounds(group),w=bb[2]-bb[0],h=bb[3]-bb[1];
-  if(w<7||h<10||w/h<.31||w/h>1.30)return false;
-  const d=Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1]);
-  if(d>Math.max(12,Math.min(w,h)*.32))return false;
-  let winding=0;
-  const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
-  for(let i=1;i<pts.length;i++){
-    const a=Math.atan2(pts[i-1][1]-cy,pts[i-1][0]-cx),b=Math.atan2(pts[i][1]-cy,pts[i][0]-cx);
-    winding+=Math.atan2(Math.sin(b-a),Math.cos(b-a));
-  }
-  return Math.abs(winding)>4.3;
-}
-function nearKnownDigit(pg,group){
-  const bb=strokeInkBounds(group),cy=(bb[1]+bb[3])/2,h=bb[3]-bb[1];
-  return pg.strokes.some(it=>it.t==="x"&&/^[0-9]$/.test(it.text||"")&&
-    Math.abs((bbox(it)[1]+bbox(it)[3])/2-cy)<Math.max(28,h*1.2)&&
-    Math.min(Math.abs(bbox(it)[0]-bb[2]),Math.abs(bb[0]-bbox(it)[2]))<Math.max(45,h*1.8));
-}
-function groupGlyphStrokes(items){
-  // Union overlapping ink pieces (e.g. dot + body of i, or separate bars of A).
-  // Disjoint characters stay separate; connected cursive is not split blindly.
-  const bb=items.map(bbox),parent=items.map((_,i)=>i);
-  const root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
-  const unite=(i,j)=>{const x=root(i),y=root(j);if(x!==y)parent[y]=x;};
-  for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){
-    const a=bb[i],b=bb[j],aw=Math.max(2,a[2]-a[0]),bw=Math.max(2,b[2]-b[0]);
-    const overlap=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]));
-    const gapY=Math.max(0,a[1]-b[3],b[1]-a[3]);
-    const dot=aw<16||bw<16;
-    const centerGap=Math.abs((a[0]+a[2]-b[0]-b[2])/2);
-    if(gapY<36&&(overlap>Math.min(aw,bw)*.24||(dot&&centerGap<Math.max(aw,bw)*.48+7)))unite(i,j);
-  }
-  const groups=new Map();items.forEach((it,i)=>{const k=root(i);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(it);});
-  return [...groups.values()].sort((a,b)=>strokeInkBounds(a)[0]-strokeInkBounds(b)[0]);
-}
-function plausibleGlyph(items){
-  const b=strokeInkBounds(items),w=b[2]-b[0],h=b[3]-b[1];
-  // Keep connected multi-letter strokes; they cannot be segmented safely.
-  return w>=4&&h>=7&&h<=125&&w<=140&&w/Math.max(10,h)<=2.6;
-}
-function makeCalligGlyph(items,char,lang){
-  const bb=strokeInkBounds(items),x=clamp(bb[0],3,W-30),y=Math.max(3,bb[1]-3);
-  const height=Math.max(12,bb[3]-bb[1]),width=Math.max(9,bb[2]-bb[0]);
-  let fs=clamp(height*1.2,18,88);
-  tctx.font=glyphFont(fs,lang,char);
-  let measured=Math.max(1,tctx.measureText(char).width);
-  // Place each glyph in its original location; do not reflow the word.
-  const sx=clamp(width/measured,.56,1.50),tw=Math.max(13,Math.min(W-x-5,measured*sx+8));
-  return {t:"x",x,y,tw,fs,c:items[0].c||S.penColor,text:char,lang,fam:"callig",glyphScaleX:sx,inkW:items[0].w||PEN_W[S.penW]};
-}
-async function loadCalligFont(lang,fs){try{if(document.fonts&&document.fonts.load){await document.fonts.load(calligFont(fs,lang));fontEpoch++;}}catch(e){}}
-function replaceCalligGlyphs(pg,guesses,lang){
-  if(!pg||!guesses.length)return false;
-  const valid=guesses.filter(g=>g.char&&oneGlyph(g.char,lang)===g.char&&g.items.every(it=>pg.strokes.includes(it)));
-  if(!valid.length)return false;
-  const before=pg.strokes.slice(),byIndex=new Map(),remove=new Set();
-  for(const g of valid){const first=before.indexOf(g.items[0]);byIndex.set(first,makeCalligGlyph(g.items,g.char,lang));g.items.forEach(it=>remove.add(it));}
-  const after=[];
-  before.forEach((it,i)=>{if(byIndex.has(i))after.push(byIndex.get(i));if(!remove.has(it))after.push(it);});
-  pg.strokes=after;redraw(pg);commitPage(pg,before);clearSel();
-  loadCalligFont(lang,35).then(()=>{if(pg.strokes===after)redraw(pg);});
-  return true;
-}
-function showGlyphReview(pg,results,lang){
-  const box=$("calligReview"),input=$("calligReviewText");
-  $("calligReviewTitle").textContent=tt("calligReview");
-  $("calligReviewInfo").textContent=tt("calligGlyphReviewHint")+" ("+results.length+")";
-  $("calligKeep").textContent=tt("calligKeep");$("calligApply").textContent=tt("calligApply");
-  input.value=results.map(x=>x.char||"□").join(" ");box.hidden=false;
-  const close=()=>{box.hidden=true;$("calligApply").onclick=null;$("calligKeep").onclick=null;};
-  $("calligKeep").onclick=close;
-  $("calligApply").onclick=()=>{
-    const raw=input.value.trim();
-    let chars=raw.split(/[\s|]+/u).filter(Boolean);
-    if(chars.length===1&&results.length>1)chars=graphemes(chars[0],lang);
-    if(chars.length!==results.length){toast(tt("calligGlyphCount"));return;}
-    const updates=results.map((g,i)=>({items:g.items,char:chars[i]==="□"?"":oneGlyph(chars[i],lang)}));
-    close();replaceCalligGlyphs(pg,updates,lang);
-  };
-  requestAnimationFrame(()=>input.focus());
-}
-async function recognizeCallig(pg,items,lang,manual){
-  if(!items.length||!items.every(it=>pg.strokes.includes(it)))return;
-  ocrBusy=true;
-  if(manual)toast(tt("calligWorking"),0);
-  let notify=null; // automatic handwriting processing is silent; never pop up over normal writing
-  try{
-    const groups=groupGlyphStrokes(items);
-    if(!groups.length||groups.length>30)return;
-    const worker=await loadOCR(lang),results=[];
-    for(const group of groups){
-      if(!group.every(it=>pg.strokes.includes(it)))return;
-      if(!plausibleGlyph(group)){results.push({items:group,char:"",confidence:0});continue;}
-      const img=makeCalligImage(group),answer=await worker.recognize(img.image);
-      const data=answer&&answer.data||{};
-      let char=oneGlyph(data.text,lang),confidence=Number(data.confidence)||0;
-      // A second OCR pass constrained to numbers is useful for numerals such as
-      // 2/3/5/8, but a letter is *not* overwritten with a digit solely because
-      // an isolated single-character OCR engine guessed one.
-      // A second single-character OCR vote limited to digits. This runs even
-      // when ordinary OCR confidently calls a crooked 2 'Z' or 5 'S'.
-      // Do not replace clear letters with numerals on a weak numeric guess.
-      if(!isAmbiguousOval(group)){
-        try{
-          await worker.setParameters({tessedit_char_whitelist:"0123456789",tessedit_pageseg_mode:"10"});
-          const n=await worker.recognize(img.image),nc=oneGlyph(n?.data?.text,lang),cf=Number(n?.data?.confidence)||0;
-          const numberContext=nearKnownDigit(pg,group);
-          const looksLikeDigit=/^[0-9]$/.test(char);
-          if(/^[0-9]$/.test(nc) && (looksLikeDigit&&cf>=65||
-               cf>=Math.max(numberContext?73:88,confidence+(numberContext?-5:7)) ||
-               (!char&&cf>=79))){char=nc;confidence=Math.max(cf,confidence);}
-        }finally{await worker.setParameters({tessedit_char_whitelist:"",tessedit_pageseg_mode:"10"});}
-      }
-      if(isAmbiguousOval(group)){
-        // A stand-alone oval may be O / Cyrillic О / 0. Preserve the original
-        // unless it clearly follows a digit on the same line. Never turn 0 into D.
-        if(nearKnownDigit(pg,group)){char="0";confidence=Math.max(confidence,91);}
-        else {char="";confidence=0;}
-      }
-      results.push({items:group,char,confidence});
-    }
-    if(!items.every(it=>pg.strokes.includes(it)))return;
-    if(manual){toast("");showGlyphReview(pg,results,lang);return;}
-    if(!S.calligInk||LANG!==lang||(act&&act.pg===pg))return;
-    // Only high-confidence *single characters*, never OCR-produced words.
-    const reliable=results.filter(r=>r.char&&r.confidence>=(/^[0-9]$/.test(r.char)?76:80));
-    if(reliable.length){await loadCalligFont(lang,40);replaceCalligGlyphs(pg,reliable,lang);}
-  }catch(e){console.warn("Single-character handwriting recognition unavailable:",e);if(manual)toast(tt("calligLoadError"),4500);}
-  finally{ocrBusy=false;clearTimeout(notify);const msg=$("toast");if(msg&&msg.textContent===tt("calligWorking"))msg.classList.remove("on");}
-}
-function submitCallig(pg,items,lang,manual){
-  calligJob=calligJob.catch(()=>{}).then(()=>recognizeCallig(pg,items,lang,manual));
-}
-function queueCallig(pg,it){
-  if(!S.calligInk||!pg||!isFree(it))return;
-  const now=performance.now();let g=calligPending;
-  const b=bbox(it);
-  if(g&&g.pg===pg&&g.lang===LANG&&now-g.when<3400){
-    const p=strokeInkBounds(g.items),dy=Math.max(0,b[1]-p[3],p[1]-b[3]),dx=Math.max(0,b[0]-p[2],p[0]-b[2]);
-    if(dy>Math.max(48,p[3]-p[1])||dx>140){const old=g;cancelCalligPending();submitCallig(old.pg,old.items,old.lang,false);g=null;}
-  }else if(g){const old=g;cancelCalligPending();submitCallig(old.pg,old.items,old.lang,false);g=null;}
-  if(!g)g={pg,lang:LANG,items:[],when:now};
-  g.items.push(it);g.when=now;calligPending=g;clearTimeout(calligTimer);
-  calligTimer=setTimeout(()=>{
-    if(calligPending!==g)return;calligPending=null;calligTimer=0;
-    if(g.items.length)submitCallig(g.pg,g.items,g.lang,false);
-  },1050);
-}
-function calligSelected(){
-  if(!S.sel||!S.sel.items.length){toast(tt("calligNeedSelection"));return;}
-  const {pg,items}=S.sel,selected=items.filter(isFree);
-  if(!selected.length){toast(tt("calligNeedSelection"));return;}
-  cancelCalligPending();submitCallig(pg,selected.slice(),LANG,true);
-}
-$("calligReview").addEventListener("click",e=>{if(e.target===$("calligReview"))$("calligKeep").click();});
+/* v24: Live OCR and character replacement are intentionally removed.
+   Existing recognized text objects remain readable, editable, and erasable. */
 
 /* v23: Correct numeric glyph support (0-9); ambiguous oval protected against
    mistaken D/O, and a dedicated numeric OCR retry for unclear digits. New
@@ -2055,7 +1894,7 @@ function straightStroke(stroke,points,pg){
   if(points.length<2)return null;
   const first=points[0], last=points[points.length-1];
   const chord=Math.hypot(last[0]-first[0],last[1]-first[1]);
-  const minLength=S.calligInk?52:26;
+  const minLength=26;
   if(chord<minLength)return null;
   const rs=resample(points,Math.max(16,Math.min(96,points.length*2)));
   if(!rs||rs.tot/chord>1.30)return null;
@@ -2132,6 +1971,28 @@ function axisIntersection(xLine,yLine,pg){
   if(rawX<xLine.low-margin||rawX>xLine.high+margin||rawY<yLine.low-margin||rawY>yLine.high+margin)return null;
   return [paperSnapX(rawX,pg),paperSnapY(rawY,pg)];
 }
+function upgradeAxisLabels(pg){
+  // Non-destructive upgrade: earlier v23 coordinate crosses still get numbers.
+  let changed=false;
+  for(const xx of pg.strokes){
+    if(xx.axisName!=="x"||xx.axisOrigin)continue;
+    const xp=axisSpine(xx);if(!xp)continue;
+    let yitem=null,yp=null;
+    for(const yy of pg.strokes){if(yy.axisName!=="y"||yy.axisOrigin)continue;
+      const ys=axisSpine(yy);if(!ys)continue;
+      if(!axisIntersection(xp,ys,pg))continue;
+      yitem=yy;yp=ys;break;
+    }
+    if(!yitem)continue;
+    const origin=axisIntersection(xp,yp,pg),group=uid(),cell=axisGridCell(pg);
+    for(const it of [xx,yitem]){
+      const ind=pg.strokes.indexOf(it);if(ind<0)continue;
+      pg.strokes[ind]={...cloneItem(it),axisOrigin:origin.slice(),axisStep:1,axisGroup:group,axisCell:cell};
+    }
+    changed=true;
+  }
+  return changed;
+}
 function lineDirection(it){
   const sp=axisSpine(it);
   if(sp)return {it,dx:sp.kind==="x"?sp.high-sp.low:0,dy:sp.kind==="y"?sp.high-sp.low:0,
@@ -2173,6 +2034,7 @@ function snapAxes(pg,latest){
   }
   if(!pair)return false;
   const {xl,yl,origin}=pair;
+  const group=uid(),cell=axisGridCell(pg);
   const put=(sp)=>{
     const it=sp.it,index=pg.strokes.indexOf(it);
     if(index<0)return;
@@ -2184,7 +2046,7 @@ function snapAxes(pg,latest){
       x0=x1=origin[0];y0=paperSnapY(sp.high,pg);y1=paperSnapY(sp.low,pg);
     }
     const nd={t:"p",c:it.c,w:it.w||PEN_W[S.penW],p:[x0,y0,.5,x1,y1,.5],
-      axisName:sp.kind,autoLine:it.autoLine||Date.now()};
+      axisName:sp.kind,autoLine:it.autoLine||Date.now(),axisOrigin:origin.slice(),axisStep:1,axisCell:cell,axisGroup:group};
     pg.strokes[index]=nd;
   };
   put(xl);put(yl);
@@ -2193,66 +2055,81 @@ function snapAxes(pg,latest){
   return true;
 }
 
+/* v24 scratch erase is ONLY one continuous, sub-second stroke crossing
+   pre-existing ink at four *distinct geometric points*. It cannot accumulate
+   separate pen strokes or erase neighbours that merely share a bounding box. */
 function eraseGestureMetrics(points,elapsed){
-  // A deliberate, *continuous* scribble: at least 3 strong direction reversals;
-  // writing cursive loops and a single crossing line should never erase ink.
-  if(points.length<7||elapsed>2400||elapsed<110)return null;
-  const rs=resample(points,Math.min(100,Math.max(36,points.length*3)));
-  if(!rs||rs.tot<190||rs.tot/Math.max(150,elapsed)<.16)return null;
-  const p=rs.out;
-  let sx=0,sy=0,minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
-  for(const [x,y] of p){sx+=x;sy+=y;minx=Math.min(minx,x);maxx=Math.max(maxx,x);miny=Math.min(miny,y);maxy=Math.max(maxy,y);}
-  const mx=sx/p.length,my=sy/p.length,dx=maxx-minx,dy=maxy-miny,D=Math.hypot(dx,dy);
-  if(D<36||rs.tot/D<3.4)return null;
-  let xx=0,xy=0,yy=0;
-  for(const [x,y] of p){const vx=x-mx,vy=y-my;xx+=vx*vx;xy+=vx*vy;yy+=vy*vy;}
-  const theta=.5*Math.atan2(2*xy,xx-yy),cos=Math.cos(theta),sin=Math.sin(theta);
-  const projs=p.map(([x,y])=>(x-mx)*cos+(y-my)*sin);
-  const range=Math.max(...projs)-Math.min(...projs);
-  if(range<31)return null;
-  let dir=0,run=0,swings=0,fullRuns=0;
-  const need=Math.max(20,range*.38);
-  for(let i=1;i<projs.length;i++){
-    const d=projs[i]-projs[i-1],sign=Math.sign(d);
-    if(Math.abs(d)<.6)continue;
-    if(!dir){dir=sign;run=Math.abs(d);continue;}
-    if(sign===dir){run+=Math.abs(d);continue;}
-    if(run>=need){fullRuns++;swings++;}
-    dir=sign;run=Math.abs(d);
+  if(points.length<6||elapsed>1000||elapsed<65)return null;
+  const rs=resample(points,Math.min(120,Math.max(32,points.length*2)));
+  if(!rs||rs.tot<92||rs.tot/Math.max(elapsed,1)<.14)return null;
+  let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  const path=rs.out;
+  for(const [x,y] of path){minx=Math.min(minx,x);maxx=Math.max(maxx,x);miny=Math.min(miny,y);maxy=Math.max(maxy,y);}
+  const diag=Math.hypot(maxx-minx,maxy-miny);
+  if(diag<18||rs.tot/Math.max(diag,1)<1.9)return null;
+  // A single writing line or axis should never be an eraser.
+  const first=path[0],last=path[path.length-1];
+  const endDist=Math.hypot(last[0]-first[0],last[1]-first[1]);
+  if(endDist>rs.tot*.85)return null;
+  return {path,bb:[minx,miny,maxx,maxy],time:elapsed};
+}
+function crossingPoint(a,b,c,d){
+  const rx=b[0]-a[0],ry=b[1]-a[1],sx=d[0]-c[0],sy=d[1]-c[1];
+  const det=rx*sy-ry*sx;
+  if(Math.abs(det)<1e-5)return null;
+  const qx=c[0]-a[0],qy=c[1]-a[1],t=(qx*sy-qy*sx)/det,u=(qx*ry-qy*rx)/det;
+  if(t<-.005||t>1.005||u<-.005||u>1.005)return null;
+  return [a[0]+t*rx,a[1]+t*ry];
+}
+function inkSegments(it){
+  if(["p","b","h"].includes(it.t)){
+    const p=it.p||[],out=[];
+    for(let i=3;i<p.length;i+=3)out.push([[p[i-3],p[i-2]],[p[i],p[i+1]]]);
+    return out;
   }
-  if(run>=need)fullRuns++;
-  if(swings<3||fullRuns<4)return null;
-  // Loopy handwriting tends to occupy a square: require a clear back/forth axis
-  // or 5+ strong reversals for more two-dimensional scrubbing.
-  if(Math.min(dx,dy)/Math.max(dx,dy)>.78&&swings<5)return null;
-  return {points:p,bb:[minx,miny,maxx,maxy],tot:rs.tot,swings};
+  const path=toPolyline(it);
+  if(path){const out=[];for(let i=1;i<path.length;i++)out.push([path[i-1],path[i]]);return out;}
+  if(it.t==="x"){
+    const bb=bbox(it);return [ [[bb[0],bb[1]],[bb[2],bb[1]]],[[bb[2],bb[1]],[bb[2],bb[3]]],[[bb[2],bb[3]],[bb[0],bb[3]]],[[bb[0],bb[3]],[bb[0],bb[1]]] ];
+  }
+  return [];
+}
+function distinctCrossings(gesture,segs,max=128){
+  const points=[];
+  for(let i=1;i<gesture.length;i++){
+    const a=gesture[i-1],b=gesture[i];
+    for(const [c,d] of segs){
+      const pt=crossingPoint(a,b,c,d);
+      if(!pt)continue;
+      if(points.some(q=>Math.hypot(q[0]-pt[0],q[1]-pt[1])<5))continue;
+      points.push(pt);if(points.length>=max)return points;
+    }
+  }
+  return points;
 }
 function scratchErase(a,points){
-  const pg=a.pg;
-  if(!pg.strokes.length)return false;
+  const pg=a.pg;if(!pg.strokes.length)return false;
   const g=eraseGestureMetrics(points,performance.now()-(a.startedAt||performance.now()));
   if(!g)return false;
-  const radius=15,prior=pg.strokes.slice(),hits=new Set();
-  // Only erase pre-existing ink (never the PDF background). Scratch must cross
-  // existing content at multiple points; freehand calligraphic letters are safe.
-  let contacts=0;
-  for(const q of g.points){
-    let hit=false;
-    for(const it of prior){
-      if(it.t==="i")continue;
-      const b=bbox(it);
-      if(q[0]<b[0]-radius||q[0]>b[2]+radius||q[1]<b[1]-radius||q[1]>b[3]+radius)continue;
-      if(hitItem(it,q[0],q[1],radius)){hits.add(it);hit=true;}
+  const before=pg.strokes.slice(),groups=[],all=[];
+  for(const it of before){
+    if(it.t==="i")continue;
+    const b=bbox(it),q=g.bb;
+    // No large hit radius: adjacent strokes are never selected by proximity alone.
+    if(b[2]<q[0]||b[0]>q[2]||b[3]<q[1]||b[1]>q[3])continue;
+    const events=distinctCrossings(g.path,inkSegments(it));
+    if(!events.length)continue;
+    groups.push({it,events});
+    for(const pt of events){
+      if(!all.some(z=>Math.hypot(z[0]-pt[0],z[1]-pt[1])<5))all.push(pt);
     }
-    if(hit)contacts++;
   }
-  if(contacts<Math.max(6,g.points.length*.16)||!hits.size)return false;
-  // Scrubbing is the user's intent to erase the area, not trim tiny segments.
-  // Remove touched strokes as one undoable action (including OCR glyphs).
-  pg.strokes=prior.filter(it=>!hits.has(it));
-  redraw(pg);commitPage(pg,prior);lastSmartInk=null;
-  vibrate();toast(tt("gestureErased"),850);
-  return true;
+  // At least four distinct actual intersections, all from THIS ONE pen stroke.
+  if(all.length<4)return false;
+  const crossed=new Set(groups.map(g=>g.it));
+  pg.strokes=before.filter(it=>!crossed.has(it));
+  redraw(pg);commitPage(pg,before);lastSmartInk=null;
+  vibrate();toast(tt("gestureErased"),900);return true;
 }
 function smartInkEnd(a){
   const s=a.stroke,pg=a.pg,points=inkPoints(s);
@@ -2267,7 +2144,6 @@ function smartInkEnd(a){
   // than every handwriting-join heuristic.
   const line=straightStroke(s,points,pg);
   if(line) return remember(line,false);
-  if(S.calligInk)return remember(s,true); // letters are not converted to circles/rectangles
   if(points.length<4||diag<54) return remember(s,true);
   const joinedWriting=!!(prev&&prev.pid===pg.id&&prev.ink&&now-prev.when<650&&
     Math.hypot(points[0][0]-prev.end[0],points[0][1]-prev.end[1])<22&&diag<85);
@@ -2300,6 +2176,58 @@ function smartInkEnd(a){
   return remember(s,true);
 }
 
+/* v24 long press any X/Y tick number to edit the entire coordinate scale. */
+function axisLabelTarget(pg,x,y){
+  let best=null,minDist=18;
+  for(const it of pg.strokes){
+    if(!axisGeometry(it))continue;
+    axisTicks(it,t=>{
+      const tilted=t.kind==="x"&&t.label.length>2;
+      const tx=t.kind==="x"?(tilted?t.x-7:t.x):t.x-10;
+      const ty=t.kind==="x"?(tilted?t.y+24:t.y+16):t.y;
+      const width=tilted?21:Math.min(74,Math.max(12,t.label.length*8));
+      const dx=Math.max(0,Math.abs(x-tx)-width/2),dy=Math.max(0,Math.abs(y-ty)-10);
+      const d=Math.hypot(dx,dy);
+      if(d<minDist){minDist=d;best={it,t};}
+    });
+  }
+  return best;
+}
+function axisEditStep(pg,source){
+  if(!pg||!pg.strokes.includes(source))return;
+  const existing=document.getElementById("axisStepDialog");if(existing)existing.remove();
+  const translations={
+    ru:["Шаг делений", "Каждая клетка остаётся одним делением. Изменятся только значения на осях X/Y.","Новый шаг (например 50)","Отмена","Применить","Введите число больше нуля"],
+    uk:["Крок поділок","Одна клітинка — одна поділка. Значення на осях зміняться.","Новий крок (наприклад 50)","Скасувати","Застосувати","Введіть додатне число"],
+    de:["Achsenschritt", "Ein Kästchen bleibt eine Teilung. Nur die Werte ändern sich.","Schrittweite (z. B. 50)","Abbrechen","Übernehmen","Bitte eine positive Zahl eingeben"],
+    en:["Axis value step","Each grid cell stays one tick. Only the X/Y numbers change.","New step (for example 50)","Cancel","Apply","Enter a positive number"]
+  };const T=translations[LANG]||translations.en;
+  const outer=h("div",{id:"axisStepDialog",class:"axis-step-overlay",role:"dialog","aria-modal":"true"});
+  const panel=h("div",{class:"axis-step-panel"});
+  const field=h("input",{type:"number",min:"0.000001",step:"any",inputmode:"decimal",id:"axisStepValue"});
+  field.value=String(Number(source.axisStep)>0?source.axisStep:1);
+  const close=()=>{outer.remove();};
+  const apply=()=>{
+    const step=Number(String(field.value).replace(",","."));
+    if(!Number.isFinite(step)||step<=0||step>1e9){toast(T[5]);field.focus();return;}
+    const group=source.axisGroup,origin=source.axisOrigin;
+    const before=pg.strokes.slice();let changed=false;
+    pg.strokes=pg.strokes.map(it=>{
+      if(!["x","y"].includes(it.axisName))return it;
+      const same=group?it.axisGroup===group:(Array.isArray(origin)&&Array.isArray(it.axisOrigin)&&Math.hypot(origin[0]-it.axisOrigin[0],origin[1]-it.axisOrigin[1])<2);
+      if(!same)return it;
+      changed=true;return {...cloneItem(it),axisStep:step};
+    });
+    if(changed){redraw(pg);commitPage(pg,before);}close();
+  };
+  const cancel=h("button",{class:"btn",type:"button",onclick:close},T[3]);
+  const save=h("button",{class:"btn primary",type:"button",onclick:apply},T[4]);
+  field.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();apply();}else if(e.key==="Escape")close();});
+  outer.addEventListener("pointerdown",e=>{if(e.target===outer)close();});
+  panel.append(h("h3",null,T[0]),h("p",null,T[1]),h("label",{for:"axisStepValue"},T[2]),field,h("div",{class:"axis-step-actions"},cancel,save));
+  outer.append(panel);document.body.append(outer);
+  setTimeout(()=>field.focus(),50);
+}
 /* ================= input ================= */
 let act=null, liveRaf=0;
 function localPt(e,rect,pg){ return [(e.clientX-rect.left)/rect.width*W,(e.clientY-rect.top)/rect.width*W]; }
@@ -2320,9 +2248,19 @@ pagesEl.addEventListener("pointerdown",(e)=>{
   if(act||pinch) return;
   const pg=el._pg, rect=el.getBoundingClientRect(), [x,y]=localPt(e,rect,pg);
   const fingerNav=e.pointerType==="touch"&&!S.finger;
+  const a={id:e.pointerId,pg,el,rect,x0:x,y0:y,cx:e.clientX,cy:e.clientY,touch:e.pointerType==="touch",fingerNav,pen:e.pointerType==="pen"};
+  // A long-press on a drawn axis number edits the step, independent of tool.
+  if(S.tool!=="er"&&S.tool!=="lasso"&&S.tool!=="text"){
+    const target=axisLabelTarget(pg,x,y);
+    if(target){
+      e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(_){}
+      a.mode="axisHold";a.axisSource=target.it;
+      a.holdT=setTimeout(()=>{if(act===a){act=null;axisEditStep(pg,a.axisSource);}},520);
+      act=a;return;
+    }
+  }
   if(textEd){ finishText(); if(S.tool==="text"||fingerNav) return; }
   if(pop) closePop();
-  const a={id:e.pointerId,pg,el,rect,x0:x,y0:y,cx:e.clientX,cy:e.clientY,touch:e.pointerType==="touch",fingerNav,pen:e.pointerType==="pen"};
   const arcWaiting=S.tool==="shape"&&S.arc&&S.arc.stage==="wait2";
   if(((S.tool==="ln"||S.tool==="shape")&&!arcWaiting)||fingerNav){
     const hs=hitShape(pg,x,y,tolU(a));
@@ -2353,6 +2291,7 @@ pagesEl.addEventListener("pointermove",(e)=>{
   const a=act; if(!a||e.pointerId!==a.id) return;
   const [x,y]=localPt(e,a.rect,a.pg);
   switch(a.mode){
+    case "axisHold":if(Math.hypot(e.clientX-a.cx,e.clientY-a.cy)>12){clearTimeout(a.holdT);act=null;}return;
     case "cand": if(Math.hypot(e.clientX-a.cx,e.clientY-a.cy)>8){ clearTimeout(a.timer); if(a.fingerNav){ act=null; return; } if(S.tool==="ln") lineStart(a); else shapeStart(a); moveTool(a,e,x,y); } return;
     default: moveTool(a,e,x,y);
   }
@@ -2376,6 +2315,7 @@ function endPointer(e){
   act=null; if(liveRaf){ cancelAnimationFrame(liveRaf); liveRaf=0; } clearOverlay("live"); clearTimeout(a.holdT);
   const up=e.type==="pointerup";
   switch(a.mode){
+    case "axisHold": return; // quick tap does nothing; hold triggers the scale editor
     case "cand": clearTimeout(a.timer); if(up&&!dimTap(a)) openPop(a.pg,a.item,e.clientX,e.clientY); return;
     case "grab": grabEnd(a); return;
     case "stroke": {
@@ -2387,10 +2327,8 @@ function endPointer(e){
       // and destructive gestures must not run on the same contact.
       let it=up&&(S.smartInk||S.scratchErase)&&S.tool==="pen"?smartInkEnd(a):a.rec||a.stroke;
       if(it){
-        if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")) it=beautifyInkStroke(it);
         commitAdd(a.pg,it);
         if(up&&S.smartInk) snapAxes(a.pg,it);
-        if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")&&!it.autoLine) queueCallig(a.pg,it);
       } return;
     }
     case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; commitAdd(a.pg,a.stroke); if(up&&S.smartInk) snapAxes(a.pg,a.stroke); return; }
@@ -2434,7 +2372,7 @@ function addStrokePt(a,e){
   extendNote(a.pg,y);
   if(Math.hypot(x-a.anchor[0],y-a.anchor[1])>3){ a.anchor=[x,y]; armHold(a); }
 }
-function armHold(a){ clearTimeout(a.holdT); if((S.smartInk||S.calligInk)&&S.tool==="pen") return; if(!S.autoShape&&S.tool!=="hl") return; a.holdT=setTimeout(()=>{ if(act!==a||a.rec) return; const r=recognize(a.stroke,a.pg); if(r){ a.rec=r; vibrate(); drawLive(); } },520); }
+function armHold(a){ clearTimeout(a.holdT); if(S.smartInk&&S.tool==="pen") return; if(!S.autoShape&&S.tool!=="hl") return; a.holdT=setTimeout(()=>{ if(act!==a||a.rec) return; const r=recognize(a.stroke,a.pg); if(r){ a.rec=r; vibrate(); drawLive(); } },520); }
 
 /* ---- line ---- */
 function lineStart(a){ a.mode="line"; a.mg={}; a.endSnap=null; a.stroke={t:"p",c:S.penColor,w:PEN_W[S.penW],p:[]}; const sn=snapPt(a.pg,a.x0,a.y0), g=sn?null:snapStart(a.pg,a.x0,a.y0); const s=sn||(g&&g.pt)||[a.x0,a.y0]; a.stroke.p.push(s[0],s[1],.5,s[0],s[1],.5); a.s0=s; a.s0Snap=g; a.startSnapped=!!sn; a.lenMm=0; a.deg=0; if(S.lnLen!==null) lineMove(a,a.x0+1,a.y0); drawLiveSoon(); }
