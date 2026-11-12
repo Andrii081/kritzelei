@@ -1,4 +1,4 @@
-# Kritzelei v19 — Doodles / Каракули / Kritzelei
+# Kritzelei v20 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -83,3 +83,13 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - Supported recognition language codes: en, de, uk, ru, pl, tr, es, fr, it, pt, nl, ar, zh (Simplified), ja, ko. Recognition quality varies greatly by language/handwriting and is **not guaranteed**: Tesseract is primarily OCR for printed text, not professional Pencil handwriting recognition.
 - Calligraphic display uses Caveat for Latin/Cyrillic, Aref Ruqaa Ink for Arabic, Ma Shan Zheng for Chinese, Yuji Syuku for Japanese, and Nanum Pen Script for Korean. Fonts are requested from Google Fonts on demand; fallback fonts apply if offline.
 - The notebook and its PDF/export structure remain identical to v18. No changes are made to existing notes until the new feature is enabled.
+
+
+## v20 — safer handwriting and individual letters
+
+- Fixed the disappearing-letter problem: **scratch erase now has its own switch, OFF by default**, independent of geometry recognition. Scribble erasing requires at least seven deliberate quick alternating passes over existing ink; it cannot run when calligraphy mode is enabled. Note that if both features are enabled, handwriting protection takes priority.
+- In Calligraphy mode the pen stays in handwriting mode, even if Auto geometry was enabled, to avoid silently converting parts of letters into technical shapes. A small, bounded smoothing filter removes jitter without changing stroke topology or deleting strokes.
+- OCR now analyzes **spatially separate letter/character groups** using Tesseract single-character mode (PSM 10), not entire words. Each securely recognized character is positioned independently where it was written. Only very confident readings (93%+) change automatically. Uncertain characters remain as gently smoothed hand ink.
+- Lasso → Beautify selected handwriting opens a per-character review. Characters are separated by spaces; use `□` to keep an individual handwritten glyph. Corrections are applied only to validated single characters. Undo restores every replaced stroke.
+- **Limitations:** joined cursive letters or multiple connected characters cannot be segmented reliably without a specialized handwriting AI. For those, the app keeps original handwriting and merely smooths strokes. Tesseract.js is primarily printed-text OCR, so actual iPad handwriting recognition remains experimental and may rarely convert letters. The first OCR model download requires internet.
+- Previous PDFs, colored ink, calculators, icon and language-specific names remain unchanged.

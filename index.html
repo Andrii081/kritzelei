@@ -421,7 +421,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v19";
+const APP_VER="v20";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -813,7 +813,7 @@ function textLines(it){
   }
   it._lk=key; it._lines=out; return out;
 }
-function drawText(ctx,it){ const lines=textLines(it), lh=it.fs*1.3; ctx.save(); ctx.fillStyle=it.c; ctx.font=fontForItem(it); ctx.textBaseline="middle"; lines.forEach((ln,i)=>ctx.fillText(ln,it.x,it.y+i*lh+lh/2)); ctx.restore(); }
+function drawText(ctx,it){ const lines=textLines(it), lh=it.fs*1.3; ctx.save(); ctx.fillStyle=it.c; ctx.font=fontForItem(it); ctx.textBaseline="middle"; if(it.glyphScaleX){ctx.translate(it.x,it.y);ctx.scale(it.glyphScaleX,1);lines.forEach((ln,i)=>ctx.fillText(ln,0,i*lh+lh/2));} else lines.forEach((ln,i)=>ctx.fillText(ln,it.x,it.y+i*lh+lh/2)); ctx.restore(); }
 function drawImg(ctx,it){ const r=imgRec(it.ref); if(r.ok) ctx.drawImage(r.img,it.x,it.y,it.iw,it.ih); else { ctx.save(); ctx.fillStyle="#eef1f6"; ctx.fillRect(it.x,it.y,it.iw,it.ih); ctx.strokeStyle="#c3cad6"; ctx.lineWidth=2; ctx.strokeRect(it.x,it.y,it.iw,it.ih); ctx.restore(); } }
 function drawItem(ctx,it){
   switch(it.t){
@@ -965,8 +965,38 @@ Object.assign(I18N["zh"],{"calligInk": "书法美化 · 手写识别", "calligHi
 Object.assign(I18N["ja"],{"calligInk": "美文字 · 手書き認識", "calligHint": "選択した言語で手書きを認識します。初回は言語モデルのダウンロードに通信が必要です。認識処理は端末内で行います。", "calligSelection": "選択した文字を美文字に", "calligReview": "認識結果を確認", "calligKeep": "手書きを残す", "calligApply": "美文字に置換", "calligWorking": "手書き認識中…", "calligLoadError": "モデルを読み込めません。通信を確認してください。", "calligNeedSelection": "先に投げ縄で文字を選択してください。", "calligRecognized": "認識された文字", "calligUncertain": "認識が不確実なため元の筆跡を残しました。"});
 Object.assign(I18N["ko"],{"calligInk": "손글씨 보정 · 글자 인식", "calligHint": "선택한 언어의 손글씨를 인식합니다. 처음에는 언어 모델을 다운로드할 인터넷이 필요합니다. 인식은 기기에서 수행됩니다.", "calligSelection": "선택한 손글씨 꾸미기", "calligReview": "인식 결과 확인", "calligKeep": "원본 유지", "calligApply": "예쁜 글씨로 교체", "calligWorking": "손글씨 인식 중…", "calligLoadError": "모델을 불러오지 못했습니다. 인터넷을 확인하세요.", "calligNeedSelection": "먼저 올가미로 글씨를 선택하세요.", "calligRecognized": "인식된 글자", "calligUncertain": "인식이 불확실하여 원본을 유지했습니다."});
 Object.assign(I18N["tr"],{"calligInk": "Güzel yazı · el yazısı tanıma", "calligHint": "Seçilen dilde el yazısını tanır. İlk kullanımda dil modelini indirmek için internet gerekir; işleme cihazda yapılır.", "calligSelection": "Seçilen yazıyı güzelleştir", "calligReview": "Tanınan metni kontrol et", "calligKeep": "Yazıyı koru", "calligApply": "Kaligrafiyle değiştir", "calligWorking": "El yazısı tanınıyor…", "calligLoadError": "Model yüklenemedi. İnterneti kontrol edin.", "calligNeedSelection": "Önce kementle el yazısını seçin.", "calligRecognized": "Tanınan metin", "calligUncertain": "Güvenilir tanıma yok. Asıl yazı korundu."});
-const S={calcPos:null,calcDeg:true,pick:null,snap:true,scanMode:"color",nb:null,pages:[],tool:"pen",penColor:PEN_COLORS[0],hlColor:HL_COLORS[0],penW:1,hlW:1,finger:false,penType:"pen",autoShape:true,smartInk:false,calligInk:false,custom:[],erMode:"whole",erSize:1,txtSize:1,shape:"circle",zoom:1,folder:"",query:"",undo:[],redo:[],lnLen:null,lnAng:null,fix:{dia:null,bw:null,bh:null},sel:null,clip:null,arc:null,baseW:880};
-const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","calligInk","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
+Object.assign(I18N["ru"],{"scratchErase": "Стирание плотным жестом (отдельно)", "scratchEraseHint": "Стирание жестом выключено по умолчанию. Включи отдельно, если нужно. Нужны не менее семи быстрых проходов поверх существующего текста. Во время каллиграфии оно отключено для защиты букв.", "calligInk": "Каллиграфия · отдельные буквы", "calligHint": "Распознаются только отдельные буквы и иероглифы, не целые слова. Штрихи слегка сглаживаются, уверенно распознанные символы выравниваются по одному. Слитные буквы сохраняются без замены.", "calligGlyphReviewHint": "Буквы по одной, через пробел. □ = оставить исходный штрих.", "calligGlyphCount": "Количество букв не совпадает с выделенными символами."});
+Object.assign(I18N["uk"],{"scratchErase": "Стирання щільним жестом (окремо)", "scratchEraseHint": "Увімкніть окремо. Потрібно щонайменше сім швидких рухів над наявним текстом. Під час каліграфії вимкнено для захисту літер.", "calligInk": "Каліграфія · окремі літери", "calligHint": "Розпізнаються окремі літери, а не слова. Непевні або з’єднані символи залишаються рукописними.", "calligGlyphReviewHint": "Літери через пробіл. □ означає зберегти оригінал.", "calligGlyphCount": "Кількість літер не відповідає виділенню."});
+Object.assign(I18N["en"],{"scratchErase": "Scratch eraser (separate switch)", "scratchEraseHint": "Off by default to protect handwriting. Enable only when needed; requires at least seven rapid back-and-forth passes over existing ink. Disabled during calligraphy.", "calligInk": "Calligraphy · individual letters", "calligHint": "Each separate letter or character is recognized independently, never the full word. Ink is gently smoothed; uncertain and joined cursive stays handwritten.", "calligGlyphReviewHint": "One character per space; □ keeps original ink.", "calligGlyphCount": "Character count does not match selected groups."});
+Object.assign(I18N["de"],{"scratchErase": "Kratz-Radierer (extra Schalter)", "scratchEraseHint": "Zum Schutz der Schrift standardmäßig aus. Nur schnelle, dichte Wiederholungen über vorhandener Tinte löschen. Bei Schönschrift deaktiviert.", "calligInk": "Schönschrift · einzelne Buchstaben", "calligHint": "Einzelne Zeichen statt Wörter. Unsichere oder verbundene Schreibzüge bleiben erhalten.", "calligGlyphReviewHint": "Ein Zeichen pro Leerzeichen. □ lässt die Tinte unverändert.", "calligGlyphCount": "Die Anzahl der Zeichen stimmt nicht überein."});
+Object.assign(I18N["pl"],{"scratchErase": "Gumka gestem (osobny przełącznik)", "scratchEraseHint": "Domyślnie wyłączona. Wymaga wielu szybkich ruchów na istniejącym piśmie; nie działa podczas kaligrafii.", "calligInk": "Kaligrafia · pojedyncze litery", "calligHint": "Rozpoznaje pojedyncze litery, nie całe wyrazy. Niepewne znaki zachowują odręczne pismo.", "calligGlyphReviewHint": "Jeden znak oddzielony spacją. □ zachowuje oryginał.", "calligGlyphCount": "Liczba znaków się nie zgadza."});
+Object.assign(I18N["es"],{"scratchErase": "Borrar garabateando (opcional)", "scratchEraseHint": "Desactivado por defecto para proteger la escritura. Requiere varios movimientos rápidos sobre tinta existente.", "calligInk": "Caligrafía · letras individuales", "calligHint": "Reconoce letras por separado, no palabras completas. Conserva los trazos dudosos.", "calligGlyphReviewHint": "Un carácter por espacio. □ conserva el trazo original.", "calligGlyphCount": "El número de caracteres no coincide."});
+Object.assign(I18N["fr"],{"scratchErase": "Effacer en gribouillant (séparé)", "scratchEraseHint": "Désactivé par défaut pour protéger l’écriture. Plusieurs passages rapides sont nécessaires.", "calligInk": "Calligraphie · lettres séparées", "calligHint": "Reconnaît chaque lettre séparément, jamais le mot entier. Garde les tracés incertains.", "calligGlyphReviewHint": "Un caractère par espace. □ conserve le tracé.", "calligGlyphCount": "Le nombre de caractères ne correspond pas."});
+Object.assign(I18N["it"],{"scratchErase": "Cancella scarabocchiando (separato)", "scratchEraseHint": "Disattivato per impostazione predefinita. Richiede molti passaggi rapidi sopra l’inchiostro.", "calligInk": "Calligrafia · lettere singole", "calligHint": "Riconosce lettere separate, non parole. Conserva i tratti incerti.", "calligGlyphReviewHint": "Un carattere per spazio. □ mantiene il tratto.", "calligGlyphCount": "Il numero di caratteri non corrisponde."});
+Object.assign(I18N["pt"],{"scratchErase": "Apagar com rabiscos (opcional)", "scratchEraseHint": "Desativado por padrão. Exige vários movimentos rápidos sobre tinta existente.", "calligInk": "Caligrafia · letras individuais", "calligHint": "Reconhece letras separadamente, não palavras inteiras. Mantém traços incertos.", "calligGlyphReviewHint": "Um caractere por espaço. □ preserva o original.", "calligGlyphCount": "O número de caracteres não corresponde."});
+Object.assign(I18N["nl"],{"scratchErase": "Krabben om te wissen (apart)", "scratchEraseHint": "Standaard uit om handschrift te beschermen. Vereist meerdere snelle bewegingen over bestaande inkt.", "calligInk": "Schoonschrift · losse letters", "calligHint": "Herkent losse letters, geen hele woorden. Onzekere streken blijven handschrift.", "calligGlyphReviewHint": "Eén teken per spatie. □ behoudt het origineel.", "calligGlyphCount": "Aantal tekens komt niet overeen."});
+Object.assign(I18N["ar"],{"scratchErase": "ممحاة الخربشة (مفتاح منفصل)", "scratchEraseHint": "متوقفة افتراضيًا لحماية الحروف. تتطلب حركات عديدة وسريعة فوق الحبر الموجود.", "calligInk": "الخط الجميل · حرفًا حرفًا", "calligHint": "يتم التعرف على كل حرف منفصل وليس كلمات كاملة؛ الحروف المتصلة تبقى كما هي.", "calligGlyphReviewHint": "افصل الأحرف بمسافة. □ للإبقاء على الأصل.", "calligGlyphCount": "عدد الأحرف غير مطابق."});
+Object.assign(I18N["zh"],{"scratchErase": "快速涂划擦除（独立开关）", "scratchEraseHint": "默认关闭以避免误删笔画。需要在已有墨迹上快速反复涂划多次；书法模式下禁用。", "calligInk": "书法美化 · 逐字识别", "calligHint": "分别识别单个汉字，不替换整个词语。无法可靠分开的连笔会保留。", "calligGlyphReviewHint": "每个字之间留空格。□ 表示保留原笔迹。", "calligGlyphCount": "字符数量与选区不匹配。"});
+Object.assign(I18N["ja"],{"scratchErase": "なぐり消し（個別設定）", "scratchEraseHint": "誤消去を防ぐため初期状態ではオフ。文字の上を高速で何度も往復した場合のみ消します。", "calligInk": "美文字 · 1文字ずつ", "calligHint": "単語ではなく1文字ずつ認識します。判定が不確かな筆跡はそのまま残します。", "calligGlyphReviewHint": "1文字ずつ空白で区切る。□は元の筆跡を保持。", "calligGlyphCount": "文字数が選択範囲と一致しません。"});
+Object.assign(I18N["ko"],{"scratchErase": "낙서로 지우기 (별도 옵션)", "scratchEraseHint": "오작동 방지를 위해 기본 해제. 기존 필기를 빠르게 여러 번 왕복할 때만 지웁니다.", "calligInk": "손글씨 교정 · 글자별", "calligHint": "단어 전체가 아니라 글자 하나씩 인식합니다. 불확실한 필기는 원형 그대로 둡니다.", "calligGlyphReviewHint": "한 글자씩 공백으로 구분. □는 원본 유지.", "calligGlyphCount": "글자 수가 일치하지 않습니다."});
+Object.assign(I18N["tr"],{"scratchErase": "Karalayarak silme (ayrı ayar)", "scratchEraseHint": "Yanlış silmeleri önlemek için varsayılan olarak kapalı. Var olan yazı üzerinde çok sayıda hızlı hareket gerekir.", "calligInk": "Güzel yazı · tek tek harfler", "calligHint": "Kelimeleri değil ayrı harfleri tanır. Belirsiz çizimler korunur.", "calligGlyphReviewHint": "Her harfi boşlukla ayırın. □ orijinali korur.", "calligGlyphCount": "Harf sayısı eşleşmiyor."});
+Object.assign(I18N["ru"],{"smartInk": "Авто: письмо / черчение", "smartInkHint": "Распознаёт уверенные одиночные линии, дуги и фигуры. Стирание жестом включается отдельно. Для защиты букв включи «Каллиграфия». Потом можно снять галочку и вернуться к обычному письму."});
+Object.assign(I18N["uk"],{"smartInk": "Авто: письмо / креслення", "smartInkHint": "Вирівнює окремі лінії та фігури. Стирання жестом вмикається окремо. Каліграфія захищає літери."});
+Object.assign(I18N["en"],{"smartInk": "Auto: handwriting / drawing", "smartInkHint": "Straightens confident individual lines and shapes. Scratch erasing has a separate switch. Calligraphy mode protects letters."});
+Object.assign(I18N["de"],{"smartInk": "Auto: Schreiben / Zeichnen", "smartInkHint": "Erkennt klare Linien und Formen. Kratz-Radieren wird separat aktiviert. Schönschrift schützt Buchstaben."});
+Object.assign(I18N["pl"],{"smartInk": "Auto: pismo / rysowanie", "smartInkHint": "Prostuje wyraźne linie i figury. Wymazywanie gestem ma osobny przełącznik."});
+Object.assign(I18N["es"],{"smartInk": "Auto: escritura / dibujo", "smartInkHint": "Endereza líneas y formas seguras. El borrado por gestos se activa por separado."});
+Object.assign(I18N["fr"],{"smartInk": "Auto : écriture / dessin", "smartInkHint": "Redresse les lignes et figures fiables. La gomme gestuelle est un réglage séparé."});
+Object.assign(I18N["it"],{"smartInk": "Auto: scrittura / disegno", "smartInkHint": "Corregge linee e forme chiare. La cancellazione con gesti si attiva a parte."});
+Object.assign(I18N["pt"],{"smartInk": "Auto: escrita / desenho", "smartInkHint": "Alinha linhas e formas claras. Apagar por gestos tem um controle separado."});
+Object.assign(I18N["nl"],{"smartInk": "Auto: schrijven / tekenen", "smartInkHint": "Maakt duidelijke lijnen en vormen recht. Vegen om te wissen is een aparte instelling."});
+Object.assign(I18N["ar"],{"smartInk": "تلقائي: كتابة / رسم", "smartInkHint": "يصحح الخطوط والأشكال الواضحة. محو الخربشة له مفتاح منفصل."});
+Object.assign(I18N["zh"],{"smartInk": "自动：手写 / 绘图", "smartInkHint": "自动矫正清晰的直线和图形。涂划擦除需单独启用。"});
+Object.assign(I18N["ja"],{"smartInk": "自動：手書き / 製図", "smartInkHint": "明確な直線や図形を補正します。なぐり消しは別の設定です。"});
+Object.assign(I18N["ko"],{"smartInk": "자동: 필기 / 도형", "smartInkHint": "명확한 선과 도형을 보정합니다. 낙서로 지우기는 별도 옵션입니다."});
+Object.assign(I18N["tr"],{"smartInk": "Otomatik: yazı / çizim", "smartInkHint": "Net çizgileri ve şekilleri düzeltir. Karalayarak silme ayrı etkinleştirilir."});
+const S={calcPos:null,calcDeg:true,pick:null,snap:true,scanMode:"color",nb:null,pages:[],tool:"pen",penColor:PEN_COLORS[0],hlColor:HL_COLORS[0],penW:1,hlW:1,finger:false,penType:"pen",autoShape:true,smartInk:false,scratchErase:false,calligInk:false,custom:[],erMode:"whole",erSize:1,txtSize:1,shape:"circle",zoom:1,folder:"",query:"",undo:[],redo:[],lnLen:null,lnAng:null,fix:{dia:null,bw:null,bh:null},sel:null,clip:null,arc:null,baseW:880};
+const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","scratchErase","calligInk","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
 try{ const pref=JSON.parse(localStorage.getItem("kritzelei.prefs")||"{}"); for(const k of PREF_KEYS) if(pref[k]!==undefined) S[k]=pref[k]; }catch(e){}
 function savePrefs(){ try{ const o={}; for(const k of PREF_KEYS) o[k]=S[k]; localStorage.setItem("kritzelei.prefs",JSON.stringify(o)); }catch(e){} }
 const dirty=new Set(); let metaDirty=false, saveT=null, saving=false, saveAgain=false;
@@ -1397,6 +1427,11 @@ function renderOptsInner(o){
     smart.checked=!!S.smartInk;
     smart.onchange=()=>{ S.smartInk=smart.checked; savePrefs(); renderOpts(); };
     o.append(h("label",{class:"tog smart-mode",title:tt("smartInkHint")},smart,tt("smartInk")));
+    const scratch=h("input",{type:"checkbox",id:"scratchErase","aria-label":tt("scratchErase")});
+    scratch.checked=!!S.scratchErase;
+    scratch.disabled=!!S.calligInk; // writing protection takes priority
+    scratch.onchange=()=>{S.scratchErase=scratch.checked;savePrefs();renderOpts();};
+    o.append(h("label",{class:"tog smart-mode",title:tt("scratchEraseHint")},scratch,tt("scratchErase")));
     const cc=h("input",{type:"checkbox",id:"calligInk","aria-label":tt("calligInk")});
     cc.checked=!!S.calligInk;
     cc.onchange=()=>{ S.calligInk=cc.checked; if(!cc.checked) cancelCalligPending(); savePrefs(); renderOpts(); };
@@ -1710,108 +1745,182 @@ function recognize(stroke,pg){
   return null;
 }
 
-/* ================= v19 optional multilingual handwriting to calligraphy =================
-   Tesseract.js runs in this browser; language data/engine downloads are needed the
-   first time. No handwriting image is uploaded to an OCR server. Recognition is
-   conservative: only a high-confidence multi-stroke group is auto-replaced.
-   Manual selection always requires approval and supports editing an OCR guess. */
+/* ================= v20: SAFE CHARACTER-LEVEL INK + OPTIONAL OCR =================
+   Original ink is never deleted by an uncertain OCR reading. Tesseract sees
+   each spatially separable glyph independently in single-character mode.
+   Joining cursive letters are kept as ink, because their divisions are not
+   inferable reliably from geometrical stroke groups. This is *not* word OCR.
+   All OCR runs on the device; first load of engine and a language needs internet. */
 const OCR_LANG={en:"eng",de:"deu",uk:"ukr",ru:"rus",pl:"pol",tr:"tur",es:"spa",fr:"fra",it:"ita",pt:"por",nl:"nld",ar:"ara",zh:"chi_sim",ja:"jpn",ko:"kor"};
 const OCR_LIB="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
 let calligPending=null,calligTimer=0,calligJob=Promise.resolve(),ocrWorker=null,ocrWorkerLang=null,ocrScriptP=null,ocrBusy=false;
-function cancelCalligPending(){ clearTimeout(calligTimer); calligTimer=0; calligPending=null; }
-function strokeInkBounds(items){ let bb=[Infinity,Infinity,-Infinity,-Infinity]; for(const it of items){const z=bbox(it);bb=[Math.min(bb[0],z[0]),Math.min(bb[1],z[1]),Math.max(bb[2],z[2]),Math.max(bb[3],z[3])];} return bb; }
+function cancelCalligPending(){clearTimeout(calligTimer);calligTimer=0;calligPending=null;}
+function strokeInkBounds(items){let bb=[Infinity,Infinity,-Infinity,-Infinity];for(const it of items){const z=bbox(it);bb=[Math.min(bb[0],z[0]),Math.min(bb[1],z[1]),Math.max(bb[2],z[2]),Math.max(bb[3],z[3])];}return bb;}
+function beautifyInkStroke(it){
+  // A tiny regularization of hand movement; NEVER changes letter topology,
+  // removes strokes, or swaps characters. Keeps pressure data and endpoints.
+  const p=it.p||[],n=p.length/3;
+  if(n<4)return it;
+  const out=p.slice();
+  for(let i=1;i<n-1;i++){
+    const j=i*3;
+    const x=(p[j-3]+2*p[j]+p[j+3])/4,y=(p[j-2]+2*p[j+1]+p[j+4])/4;
+    // Caps displacement to preserve sharp joins such as Cyrillic Д or Chinese strokes.
+    const dx=x-p[j],dy=y-p[j+1],d=Math.hypot(dx,dy);
+    const v1x=p[j]-p[j-3],v1y=p[j+1]-p[j-2],v2x=p[j+3]-p[j],v2y=p[j+4]-p[j+1];
+    const c=(v1x*v2x+v1y*v2y)/Math.max(.01,Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y));
+    const cap=Math.min(c<.35?.35:1.2,d),f=d?cap/d:0;
+    out[j]=Math.round((p[j]+dx*f)*10)/10;
+    out[j+1]=Math.round((p[j+1]+dy*f)*10)/10;
+    if(it.t==="p"){
+      const down=clamp((v1y+v2y)/(Math.hypot(v1x+v2x,v1y+v2y)+.01),-1,1);
+      out[j+2]=Math.round(clamp(.84*p[j+2]+.16*(.49+.18*down),.20,.95)*100)/100;
+    }
+  }
+  return {...it,p:out};
+}
 async function loadOCR(lang){
-  if(!window.Tesseract){ if(!ocrScriptP) ocrScriptP=loadScript(OCR_LIB).catch(e=>{ocrScriptP=null;throw e;}); await ocrScriptP; }
-  if(ocrWorker&&ocrWorkerLang===lang) return ocrWorker;
-  if(ocrWorker){try{await ocrWorker.terminate();}catch(e){} ocrWorker=null;ocrWorkerLang=null;}
-  const code=OCR_LANG[lang]||"eng";
-  ocrWorker=await window.Tesseract.createWorker(code,1,{cacheMethod:"write",logger:()=>{}});
+  if(!window.Tesseract){if(!ocrScriptP)ocrScriptP=loadScript(OCR_LIB).catch(e=>{ocrScriptP=null;throw e;});await ocrScriptP;}
+  if(ocrWorker&&ocrWorkerLang===lang)return ocrWorker;
+  if(ocrWorker){try{await ocrWorker.terminate();}catch(e){}ocrWorker=null;ocrWorkerLang=null;}
+  ocrWorker=await window.Tesseract.createWorker(OCR_LANG[lang]||"eng",1,{cacheMethod:"write",logger:()=>{}});
   ocrWorkerLang=lang;
-  if(ocrWorker.setParameters) await ocrWorker.setParameters({tessedit_pageseg_mode:"7",preserve_interword_spaces:"1"});
+  if(ocrWorker.setParameters)await ocrWorker.setParameters({tessedit_pageseg_mode:"10",preserve_interword_spaces:"0"});
   return ocrWorker;
 }
 function makeCalligImage(items){
-  const bb=strokeInkBounds(items),width=Math.max(2,bb[2]-bb[0]),height=Math.max(2,bb[3]-bb[1]),pad=20;
-  const scale=Math.min(4,1800/Math.max(width,height)),c=document.createElement("canvas");
-  c.width=Math.max(96,Math.ceil((width+2*pad)*scale));c.height=Math.max(80,Math.ceil((height+2*pad)*scale));
+  const bb=strokeInkBounds(items),width=Math.max(2,bb[2]-bb[0]),height=Math.max(2,bb[3]-bb[1]),pad=24;
+  const scale=Math.min(4,1200/Math.max(width,height)),c=document.createElement("canvas");
+  c.width=Math.max(96,Math.ceil((width+2*pad)*scale));c.height=Math.max(96,Math.ceil((height+2*pad)*scale));
   const ctx=c.getContext("2d",{willReadFrequently:true});
   ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
   ctx.setTransform(scale,0,0,scale,(pad-bb[0])*scale,(pad-bb[1])*scale);
-  for(const it of items) if(isFree(it)){let ink=cloneItem(it);ink.c="#080808";ink.w=Math.max(3.1,it.w||3);drawStroke(ctx,ink);}
+  for(const it of items)if(isFree(it)){const ink=cloneItem(it);ink.c="#070707";ink.w=Math.max(3.1,it.w||3);drawStroke(ctx,ink);}
   return {image:c,bb};
 }
 function recognizedLanguageMatches(str,lang){
-  if(!str||!str.trim())return false;
-  const allowed={ru:/[А-Яа-яЁё]/,uk:/[А-Яа-яІіЇїЄєҐґ]/,ar:/[\u0600-\u06FF]/,zh:/[\u3400-\u9FFF]/,ja:/[\u3040-\u30FF\u3400-\u9FFF]/,ko:/[\uAC00-\uD7AF]/};
-  return allowed[lang]?allowed[lang].test(str):/[A-Za-zÀ-žİıĞğŞş]/.test(str);
+  if(!str)return false;
+  const scripts={ru:/[А-Яа-яЁё]/,uk:/[А-Яа-яІіЇїЄєҐґ]/,ar:/[\u0600-\u06FF]/,zh:/[\u3400-\u9FFF]/,ja:/[\u3040-\u30FF\u3400-\u9FFF]/,ko:/[\uAC00-\uD7AF]/};
+  return scripts[lang]?scripts[lang].test(str):/[A-Za-zÀ-žİıĞğŞş]/.test(str);
 }
-function normalizeOcrText(raw){return String(raw||"").replace(/[\r\n]+/g," ").replace(/\s+/g," ").trim().slice(0,250);}
-function makeCalligText(items,str,lang){
-  const bb=strokeInkBounds(items);const x=clamp(bb[0],4,W-40),y=Math.max(4,bb[1]-3),maxwidth=Math.max(60,W-x-14);
-  let fs=clamp((bb[3]-bb[1])*1.05,22,82);
+function graphemes(s,lang){
+  const value=String(s||"").normalize("NFC");
+  if(typeof Intl!=="undefined"&&Intl.Segmenter)return [...new Intl.Segmenter(lang,{granularity:"grapheme"}).segment(value)].map(x=>x.segment);
+  return Array.from(value);
+}
+function oneGlyph(raw,lang){
+  // Reject word answers, digits and punctuation, even if Tesseract is confident.
+  const t=String(raw||"").trim().replace(/[\r\n\s]+/g,"");
+  const chars=graphemes(t,lang);
+  if(chars.length!==1||!/^\p{L}[\p{L}\p{M}]*$/u.test(chars[0]))return "";
+  return recognizedLanguageMatches(chars[0],lang)?chars[0]:"";
+}
+function groupGlyphStrokes(items){
+  // Union overlapping ink pieces (e.g. dot + body of i, or separate bars of A).
+  // Disjoint characters stay separate; connected cursive is not split blindly.
+  const bb=items.map(bbox),parent=items.map((_,i)=>i);
+  const root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  const unite=(i,j)=>{const x=root(i),y=root(j);if(x!==y)parent[y]=x;};
+  for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){
+    const a=bb[i],b=bb[j],aw=Math.max(2,a[2]-a[0]),bw=Math.max(2,b[2]-b[0]);
+    const overlap=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]));
+    const gapY=Math.max(0,a[1]-b[3],b[1]-a[3]);
+    const dot=aw<16||bw<16;
+    const centerGap=Math.abs((a[0]+a[2]-b[0]-b[2])/2);
+    if(gapY<36&&(overlap>Math.min(aw,bw)*.24||(dot&&centerGap<Math.max(aw,bw)*.48+7)))unite(i,j);
+  }
+  const groups=new Map();items.forEach((it,i)=>{const k=root(i);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(it);});
+  return [...groups.values()].sort((a,b)=>strokeInkBounds(a)[0]-strokeInkBounds(b)[0]);
+}
+function plausibleGlyph(items){
+  const b=strokeInkBounds(items),w=b[2]-b[0],h=b[3]-b[1];
+  // Keep connected multi-letter strokes; they cannot be segmented safely.
+  return w>=4&&h>=7&&h<=125&&w<=140&&w/Math.max(10,h)<=2.6;
+}
+function makeCalligGlyph(items,char,lang){
+  const bb=strokeInkBounds(items),x=clamp(bb[0],3,W-30),y=Math.max(3,bb[1]-3);
+  const height=Math.max(12,bb[3]-bb[1]),width=Math.max(9,bb[2]-bb[0]);
+  let fs=clamp(height*1.2,18,88);
   tctx.font=calligFont(fs,lang);
-  let tw=tctx.measureText(str).width;
-  if(tw>maxwidth-8){fs=clamp(fs*(maxwidth-8)/Math.max(1,tw),16,fs);tctx.font=calligFont(fs,lang);tw=tctx.measureText(str).width;}
-  return {t:"x",x,y,tw:Math.max(45,Math.min(maxwidth,tw+17)),fs,c:items[0].c||S.penColor,text:str,lang,fam:"callig"};
+  let measured=Math.max(1,tctx.measureText(char).width);
+  // Place each glyph in its original location; do not reflow the word.
+  const sx=clamp(width/measured,.56,1.50),tw=Math.max(13,Math.min(W-x-5,measured*sx+8));
+  return {t:"x",x,y,tw,fs,c:items[0].c||S.penColor,text:char,lang,fam:"callig",glyphScaleX:sx};
 }
 async function loadCalligFont(lang,fs){try{if(document.fonts&&document.fonts.load){await document.fonts.load(calligFont(fs,lang));fontEpoch++;}}catch(e){}}
-function replaceCallig(pg,items,str,lang){
-  if(!pg||!str||!items.length||!items.every(it=>pg.strokes.includes(it)))return false;
-  const before=pg.strokes.slice(),idx=before.indexOf(items[0]),set=new Set(items),txt=makeCalligText(items,str,lang);
-  pg.strokes=before.filter(it=>!set.has(it));pg.strokes.splice(Math.min(idx,pg.strokes.length),0,txt);
-  redraw(pg);commitPage(pg,before);clearSel();loadCalligFont(lang,txt.fs).then(()=>redraw(pg));return true;
+function replaceCalligGlyphs(pg,guesses,lang){
+  if(!pg||!guesses.length)return false;
+  const valid=guesses.filter(g=>g.char&&oneGlyph(g.char,lang)===g.char&&g.items.every(it=>pg.strokes.includes(it)));
+  if(!valid.length)return false;
+  const before=pg.strokes.slice(),byIndex=new Map(),remove=new Set();
+  for(const g of valid){const first=before.indexOf(g.items[0]);byIndex.set(first,makeCalligGlyph(g.items,g.char,lang));g.items.forEach(it=>remove.add(it));}
+  const after=[];
+  before.forEach((it,i)=>{if(byIndex.has(i))after.push(byIndex.get(i));if(!remove.has(it))after.push(it);});
+  pg.strokes=after;redraw(pg);commitPage(pg,before);clearSel();
+  loadCalligFont(lang,35).then(()=>{if(pg.strokes===after)redraw(pg);});
+  return true;
 }
-function showCalligReview(pg,items,str,lang,confidence){
-  if(!items.every(it=>pg.strokes.includes(it)))return;
+function showGlyphReview(pg,results,lang){
   const box=$("calligReview"),input=$("calligReviewText");
   $("calligReviewTitle").textContent=tt("calligReview");
-  $("calligReviewInfo").textContent=tt("calligRecognized")+" · "+lang.toUpperCase()+" · "+Math.round(confidence)+"%";
+  $("calligReviewInfo").textContent=tt("calligGlyphReviewHint")+" ("+results.length+")";
   $("calligKeep").textContent=tt("calligKeep");$("calligApply").textContent=tt("calligApply");
-  input.value=str;box.hidden=false;
+  input.value=results.map(x=>x.char||"□").join(" ");box.hidden=false;
   const close=()=>{box.hidden=true;$("calligApply").onclick=null;$("calligKeep").onclick=null;};
   $("calligKeep").onclick=close;
-  $("calligApply").onclick=()=>{const edited=input.value.trim();close();if(edited)replaceCallig(pg,items,edited,lang);};
+  $("calligApply").onclick=()=>{
+    const raw=input.value.trim();
+    let chars=raw.split(/[\s|]+/u).filter(Boolean);
+    if(chars.length===1&&results.length>1)chars=graphemes(chars[0],lang);
+    if(chars.length!==results.length){toast(tt("calligGlyphCount"));return;}
+    const updates=results.map((g,i)=>({items:g.items,char:chars[i]==="□"?"":oneGlyph(chars[i],lang)}));
+    close();replaceCalligGlyphs(pg,updates,lang);
+  };
   requestAnimationFrame(()=>input.focus());
 }
 async function recognizeCallig(pg,items,lang,manual){
   if(!items.length||!items.every(it=>pg.strokes.includes(it)))return;
   ocrBusy=true;
   if(manual)toast(tt("calligWorking"),0);
-  const waitNotice=manual?null:setTimeout(()=>{if(ocrBusy)toast(tt("calligWorking"),0);},1100);
+  let notify=null;
+  if(!manual)notify=setTimeout(()=>{if(ocrBusy)toast(tt("calligWorking"),0);},1300);
   try{
-    const img=makeCalligImage(items);
-    const worker=await loadOCR(lang);
-    const answer=await worker.recognize(img.image);
-    const data=answer&&answer.data||{},s=normalizeOcrText(data.text),conf=Number(data.confidence)||0;
+    const groups=groupGlyphStrokes(items);
+    if(!groups.length||groups.length>30)return;
+    const worker=await loadOCR(lang),results=[];
+    for(const group of groups){
+      if(!group.every(it=>pg.strokes.includes(it)))return;
+      if(!plausibleGlyph(group)){results.push({items:group,char:"",confidence:0});continue;}
+      const img=makeCalligImage(group),answer=await worker.recognize(img.image);
+      const data=answer&&answer.data||{},char=oneGlyph(data.text,lang),confidence=Number(data.confidence)||0;
+      results.push({items:group,char,confidence});
+    }
     if(!items.every(it=>pg.strokes.includes(it)))return;
-    if(manual){toast("");showCalligReview(pg,items,s,lang,conf);return;}
-    if(!S.calligInk||LANG!==lang||!s||!recognizedLanguageMatches(s,lang))return;
-    // A conservative threshold avoids replacing drawings or uncertain OCR results.
-    if(conf>=80&&s.replace(/\s+/g,"").length>=2){await loadCalligFont(lang,36);replaceCallig(pg,items,s,lang);}
-  }catch(e){console.warn("Calligraphy recognition unavailable:",e);if(manual)toast(tt("calligLoadError"),4500);}
-  finally{
-    ocrBusy=false;clearTimeout(waitNotice);
-    const msg=$("toast");if(msg&&msg.textContent===tt("calligWorking"))msg.classList.remove("on");
-  }
+    if(manual){toast("");showGlyphReview(pg,results,lang);return;}
+    if(!S.calligInk||LANG!==lang||(act&&act.pg===pg))return;
+    // Only high-confidence *single characters*, never OCR-produced words.
+    const reliable=results.filter(r=>r.char&&r.confidence>=93);
+    if(reliable.length){await loadCalligFont(lang,40);replaceCalligGlyphs(pg,reliable,lang);}
+  }catch(e){console.warn("Single-character handwriting recognition unavailable:",e);if(manual)toast(tt("calligLoadError"),4500);}
+  finally{ocrBusy=false;clearTimeout(notify);const msg=$("toast");if(msg&&msg.textContent===tt("calligWorking"))msg.classList.remove("on");}
 }
 function submitCallig(pg,items,lang,manual){
-  // Run requests sequentially: the OCR worker is language-specific.
   calligJob=calligJob.catch(()=>{}).then(()=>recognizeCallig(pg,items,lang,manual));
 }
 function queueCallig(pg,it){
   if(!S.calligInk||!pg||!isFree(it))return;
   const now=performance.now();let g=calligPending;
   const b=bbox(it);
-  if(g&&g.pg===pg&&g.lang===LANG&&now-g.when<3200){
+  if(g&&g.pg===pg&&g.lang===LANG&&now-g.when<3400){
     const p=strokeInkBounds(g.items),dy=Math.max(0,b[1]-p[3],p[1]-b[3]),dx=Math.max(0,b[0]-p[2],p[0]-b[2]);
-    if(dy>Math.max(50,p[3]-p[1])||dx>130){const old=g;cancelCalligPending();if(old.items.length>=2)submitCallig(old.pg,old.items,old.lang,false);g=null;}
-  }else if(g){const old=g;cancelCalligPending();if(old.items.length>=2)submitCallig(old.pg,old.items,old.lang,false);g=null;}
+    if(dy>Math.max(48,p[3]-p[1])||dx>140){const old=g;cancelCalligPending();submitCallig(old.pg,old.items,old.lang,false);g=null;}
+  }else if(g){const old=g;cancelCalligPending();submitCallig(old.pg,old.items,old.lang,false);g=null;}
   if(!g)g={pg,lang:LANG,items:[],when:now};
-  g.items.push(it);g.when=now;calligPending=g;
-  clearTimeout(calligTimer);
-  calligTimer=setTimeout(()=>{if(calligPending!==g)return;calligPending=null;calligTimer=0;
-    if(g.items.length>=2){const z=strokeInkBounds(g.items);if(z[2]-z[0]>18&&z[3]-z[1]>12)submitCallig(g.pg,g.items,g.lang,false);}
-  },1450);
+  g.items.push(it);g.when=now;calligPending=g;clearTimeout(calligTimer);
+  calligTimer=setTimeout(()=>{
+    if(calligPending!==g)return;calligPending=null;calligTimer=0;
+    if(g.items.length)submitCallig(g.pg,g.items,g.lang,false);
+  },1400);
 }
 function calligSelected(){
   if(!S.sel||!S.sel.items.length){toast(tt("calligNeedSelection"));return;}
@@ -1858,15 +1967,15 @@ function straightStroke(stroke,points,pg){
   return {t:"p",c:stroke.c,w:stroke.w,p};
 }
 function eraseGestureMetrics(points,elapsed){
-  if(points.length<5||elapsed>1900) return null;
+  if(points.length<12||elapsed>1250||elapsed<100) return null;
   const rs=resample(points,Math.min(96,Math.max(24,points.length*2)));
-  if(!rs||rs.tot<145||rs.tot/Math.max(elapsed,120)<.16) return null;
+  if(!rs||rs.tot<310||rs.tot/Math.max(elapsed,120)<.30) return null;
   const p=rs.out;
   let mx=0,my=0,minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
   for(const [x,y] of p){ mx+=x;my+=y;minx=Math.min(minx,x);maxx=Math.max(maxx,x);miny=Math.min(miny,y);maxy=Math.max(maxy,y); }
   mx/=p.length;my/=p.length;
   const width=maxx-minx,height=maxy-miny, diag=Math.hypot(width,height);
-  if(diag<29||rs.tot/Math.max(diag,1)<2.7) return null;
+  if(diag<38||rs.tot/Math.max(diag,1)<5.0) return null;
   let xx=0,xy=0,yy=0;
   for(const [x,y] of p){ const dx=x-mx,dy=y-my;xx+=dx*dx;xy+=dx*dy;yy+=dy*dy; }
   const theta=.5*Math.atan2(2*xy,xx-yy),cx=Math.cos(theta),cy=Math.sin(theta);
@@ -1886,7 +1995,7 @@ function eraseGestureMetrics(points,elapsed){
   }
   // At least four deliberate passes: a normal tick, cross, arc, circle or
   // two-stroke letter cannot be mistaken for a gesture erase.
-  if(swings<3) return null;
+  if(swings<6) return null;
   return {points:p,tot:rs.tot,bb:[minx,miny,maxx,maxy],swings};
 }
 function scratchErase(a,points){
@@ -1896,11 +2005,13 @@ function scratchErase(a,points){
   if(!g) return false;
   // A scratch is an eraser only when it passes over pre-existing handwriting.
   const radius=clamp(10+Math.min(9,(g.bb[3]-g.bb[1])/(g.swings+2)),12,22);
-  let hitExisting=false;
+  // A real deliberate scrub must repeatedly traverse existing ink, not merely
+  // touch a letter once (the common source of disappearing handwritten letters).
+  let inkContacts=0;
   for(const p of g.points){
-    if(pg.strokes.some(it=>it.t!=="i"&&hitItem(it,p[0],p[1],radius))){hitExisting=true;break;}
+    if(pg.strokes.some(it=>it.t!=="i"&&hitItem(it,p[0],p[1],radius))) inkContacts++;
   }
-  if(!hitExisting) return false;
+  if(inkContacts<Math.max(9,Math.ceil(g.points.length*.30))) return false;
   const before=pg.strokes.slice();
   const modified=[];
   // Erase a small continuous corridor around the entire back-and-forth gesture.
@@ -1935,7 +2046,8 @@ function scratchErase(a,points){
 function smartInkEnd(a){
   const s=a.stroke,pg=a.pg,points=inkPoints(s);
   if(points.length<2) return s;
-  if(scratchErase(a,points)) return null; // action was committed, no new ink
+  if(S.scratchErase&&!S.calligInk&&scratchErase(a,points)) return null; // opt-in only
+  if(!S.smartInk)return s; // separate scratch switch does not activate geometry
   const bb=bbox(s),width=bb[2]-bb[0],height=bb[3]-bb[1],diag=Math.hypot(width,height);
   const now=performance.now(),prev=lastSmartInk;
   const remember=(item,ink)=>{lastSmartInk={pid:pg.id,when:now,ink,end:points[points.length-1],bb};return item;};
@@ -2057,10 +2169,16 @@ function endPointer(e){
     case "stroke": {
       // Some iPad Pencil gestures deliver only pointerdown + pointerup. Capture the
       // release position so even the quickest single-stroke line has two points.
-      if(up&&S.smartInk&&S.tool==="pen"&&!a.rec) addStrokePt(a,e);
+      if(up&&(S.smartInk||S.scratchErase)&&S.tool==="pen"&&!a.rec) addStrokePt(a,e);
       if(!up&&!a.rec&&a.stroke.p.length<6) return;
-      const it=up&&S.smartInk&&S.tool==="pen"?smartInkEnd(a):a.rec||a.stroke;
-      if(it){ commitAdd(a.pg,it); if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")) queueCallig(a.pg,it); } return;
+      // In handwriting mode, preserve actual letter strokes; shape correction
+      // and destructive gestures must not run on the same contact.
+      let it=up&&(S.smartInk||S.scratchErase)&&S.tool==="pen"&&!S.calligInk?smartInkEnd(a):a.rec||a.stroke;
+      if(it){
+        if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")) it=beautifyInkStroke(it);
+        commitAdd(a.pg,it);
+        if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")) queueCallig(a.pg,it);
+      } return;
     }
     case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; commitAdd(a.pg,a.stroke); return; }
     case "shape": shapeEnd(a); return;
@@ -2103,7 +2221,7 @@ function addStrokePt(a,e){
   extendNote(a.pg,y);
   if(Math.hypot(x-a.anchor[0],y-a.anchor[1])>3){ a.anchor=[x,y]; armHold(a); }
 }
-function armHold(a){ clearTimeout(a.holdT); if(S.smartInk&&S.tool==="pen") return; if(!S.autoShape&&S.tool!=="hl") return; a.holdT=setTimeout(()=>{ if(act!==a||a.rec) return; const r=recognize(a.stroke,a.pg); if(r){ a.rec=r; vibrate(); drawLive(); } },520); }
+function armHold(a){ clearTimeout(a.holdT); if((S.smartInk||S.calligInk)&&S.tool==="pen") return; if(!S.autoShape&&S.tool!=="hl") return; a.holdT=setTimeout(()=>{ if(act!==a||a.rec) return; const r=recognize(a.stroke,a.pg); if(r){ a.rec=r; vibrate(); drawLive(); } },520); }
 
 /* ---- line ---- */
 function lineStart(a){ a.mode="line"; a.mg={}; a.endSnap=null; a.stroke={t:"p",c:S.penColor,w:PEN_W[S.penW],p:[]}; const sn=snapPt(a.pg,a.x0,a.y0), g=sn?null:snapStart(a.pg,a.x0,a.y0); const s=sn||(g&&g.pt)||[a.x0,a.y0]; a.stroke.p.push(s[0],s[1],.5,s[0],s[1],.5); a.s0=s; a.s0Snap=g; a.startSnapped=!!sn; a.lenMm=0; a.deg=0; if(S.lnLen!==null) lineMove(a,a.x0+1,a.y0); drawLiveSoon(); }
