@@ -1,4 +1,4 @@
-# Kritzelei v23 — Doodles / Каракули / Kritzelei
+# Kritzelei v28 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -120,10 +120,31 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 
 **Important:** Tesseract OCR remains a printed-text OCR engine, not a high-accuracy handwriting model. It is unable to guarantee reading badly formed letters/digits. The recognizer and bundled tests verify processing rules but not every user's handwriting. Test on the actual iPad/Apple Pencil and keep backup copies. Initial use of the OCR engine and font resources requires internet.
 
-## Update v24 — numbered X/Y coordinates and deliberate scratch erasing
+## Update v25 — numbered X/Y coordinates and deliberate scratch erasing
 
 - X/Y axes now show **numbered ticks for every grid cell**, initially 1, 2, 3, etc., with negative values on the other halves.
 - **Hold a number for about half a second** to enter a positive step (e.g. 50); labels become 50, 100, 150... while every grid cell stays one tick. Both axes of the same cross update; the step persists in backups and PDF exports. Existing v23 coordinate crosses are upgraded on opening.
 - All **automatic handwriting OCR / character substitution has been disabled and its controls removed**. Original handwriting is left as ink. Previously transformed calligraphy objects remain visible and erasable.
 - The optional scribble-to-erase gesture requires a **single continuous stroke completed in at most one second** that intersects pre-existing ink at **four distinct points**. Only strokes with actual geometric intersections are erased, not nearby strokes within a broad area. One undo restores the erased objects. Independent drawing strokes cannot combine into an erasing gesture.
 - Grid axes and handwritten strokes remain editable using the existing tools.
+
+
+## Kritzelei v26 — 3D axes and dense scratch erase
+- Draw X and Y as before, then add a diagonal through the same origin (around 45° / 135°): a Z axis appears, snapped to the 5-mm grid. It supports both pen and a handwritten arrowhead.
+- Z gets numbered tick marks; long-press a number on X, Y, or Z to update the numerical scale for that entire three-axis group. Each Z tick travels by one grid cell in both horizontal and vertical directions.
+- Scratch erasing also recognizes compact, repeated heavy scribbling (up to 2.4 s) using direct contact with ink; separate strokes never combine, and distant neighbors are not erased. Erasing still cannot modify original PDF backgrounds.
+- This is geometric gesture recognition, not arbitrary drawing/handwriting understanding. Use Undo if a fast mark was unintentionally interpreted as an erase gesture.
+
+
+## v26 — ось Z слева
+- Третья ось Z теперь всегда выходит из центра влево по диагонали под 45° (с сохранением направления вверх/вниз от движения пера).
+- Если провести диагональ вправо, после распознавания она автоматически отразится влево.
+- Уже сохранённые оси Z, направленные вправо, корректируются при открытии блокнота; оси X/Y, шкала и записи не меняются.
+- Все остальные функции v25 сохранены.
+
+
+## v28 — automatic equals sign
+- Two separate short, approximately horizontal pen strokes are recognized as `=` whether or not Smart Ink is enabled. Draw the second within about 30 seconds of the first, in the same color and nearby.
+- Recognition uses the original Pencil path rather than the already-snapped smart line. The completed symbol has equal-length parallel strokes, centered between graph-paper lines (inside a 5-mm square, or a major square on millimeter paper).
+- Stroke width/color are preserved; both bars are real ink saved with the notebook, included in PDF export, erasable, and restored together with a single Undo of the recognition.
+- This uses geometric pattern recognition, not OCR. It deliberately excludes long coordinate axes. If the pair is very curved, far apart or not parallel, it stays as written.

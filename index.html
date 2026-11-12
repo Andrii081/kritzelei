@@ -420,7 +420,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v24";
+const APP_VER="v28";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -596,9 +596,9 @@ function bbox(it){
     default: b=[0,0,0,0];
   }
   if(it.axisName&&(it.t==="p"||it.t==="b")){
-    // Include arrow and coordinate label in redraws and hit testing.
+    // Include ticks and their numbers along the whole axis, not only at its tip.
     const e=it.p||[];if(e.length>=6){const x=e[e.length-3],y=e[e.length-2];
-      b=[Math.min(b[0],x-42),Math.min(b[1],y-42),Math.max(b[2],x+65),Math.max(b[3],y+44)];
+      b=[Math.min(b[0]-34,x-42),Math.min(b[1]-34,y-42),Math.max(b[2]+34,x+65),Math.max(b[3]+34,y+44)];
       if(it.axisName==="x") {b[1]-=26;b[3]+=24;}
       if(it.axisName==="y") {b[0]-=45;b[2]+=24;}
     }
@@ -750,7 +750,7 @@ function strokePaths(s){
   }
   s._pp=out; s._ppk=key; return out;
 }
-/* v24 axis scale. The numbered ticks are part of each X/Y axis item, so they
+/* v25 axis scale. The numbered ticks are part of each X/Y/Z axis item, so they
    serialize, erase, export and undo together rather than drifting as text nodes. */
 const AXIS_FONT='600 14px "Rubik",system-ui,sans-serif';
 function axisGridCell(pg){
@@ -760,28 +760,38 @@ function axisGridCell(pg){
   return 5*MM;
 }
 function axisGeometry(it){
-  if(!it||!(["x","y"].includes(it.axisName))||!it.p||it.p.length!==6)return null;
+  if(!it||!(["x","y","z"].includes(it.axisName))||!it.p||it.p.length!==6)return null;
   const pp=it.p,cell=Number(it.axisCell)||5*MM,unit=(Number.isFinite(cell)&&cell>0)?cell:5*MM;
   const origin=Array.isArray(it.axisOrigin)&&it.axisOrigin.length===2?it.axisOrigin:null;
   if(!origin)return null;
+  const step=Number(it.axisStep)>0?Number(it.axisStep):1;
+  if(it.axisName==="z"){
+    // Z uses one diagonal grid square per division (sqrt(2) cells of length).
+    const far=[pp[3],pp[4]],dx=far[0]-origin[0],dy=far[1]-origin[1];
+    const len=Math.hypot(dx,dy);if(len<1)return null;
+    const ux=dx/len,uy=dy/len,du=unit*Math.SQRT2;
+    const proj=q=>(q[0]-origin[0])*ux+(q[1]-origin[1])*uy;
+    return {kind:"z",o:0,origin,unit:du,lo:Math.min(proj([pp[0],pp[1]]),proj(far)),
+      hi:Math.max(proj([pp[0],pp[1]]),proj(far)),ux,uy,step};
+  }
   const lo=it.axisName==="x"?Math.min(pp[0],pp[3]):Math.min(pp[1],pp[4]);
   const hi=it.axisName==="x"?Math.max(pp[0],pp[3]):Math.max(pp[1],pp[4]);
   const o=it.axisName==="x"?origin[0]:origin[1];
-  return {kind:it.axisName,o,origin,unit,lo,hi,step:Number(it.axisStep)>0?Number(it.axisStep):1};
+  return {kind:it.axisName,o,origin,unit,lo,hi,step};
 }
 function axisTicks(it,fn){
   const a=axisGeometry(it);if(!a)return;
-  // Clip ticks to both ends of the drawn axis; avoid enormous loops for long pages.
+  // Clip ticks to the ends of each stroke, including optional negative Z side.
   const from=Math.max(-600,Math.ceil((a.lo-a.o)/a.unit-1e-5));
   const to=Math.min(600,Math.floor((a.hi-a.o)/a.unit+1e-5));
   for(let i=from;i<=to;i++){
     if(!i)continue;
-    const n=a.kind==="x"?i:-i; // y is positive upwards
-    const x=a.kind==="x"?a.o+i*a.unit:a.origin[0];
-    const y=a.kind==="y"?a.o+i*a.unit:a.origin[1];
+    const n=a.kind==="y"?-i:i; // Y values increase upwards.
+    const x=a.kind==="x"?a.o+i*a.unit:a.kind==="z"?a.origin[0]+a.ux*i*a.unit:a.origin[0];
+    const y=a.kind==="y"?a.o+i*a.unit:a.kind==="z"?a.origin[1]+a.uy*i*a.unit:a.origin[1];
     const val=Number((n*a.step).toPrecision(12));
     const label=String(val).replace(".",DEC_COMMA.has(LANG)?",":".");
-    fn({x,y,n,value:val,label,kind:a.kind,unit:a.unit});
+    fn({x,y,n,value:val,label,kind:a.kind,unit:a.unit,ux:a.ux,uy:a.uy});
   }
 }
 function drawAxisScale(ctx,s){
@@ -793,16 +803,21 @@ function drawAxisScale(ctx,s){
     ctx.beginPath();
     if(t.kind==="x"){
       ctx.moveTo(t.x,t.y-5);ctx.lineTo(t.x,t.y+5);ctx.stroke();
-      // Numbers such as 100/150/-250 do not fit horizontally in a 5-mm cell.
-      // Tilt long labels, keeping every value visible without merging text.
       if(t.label.length>2){
         ctx.save();ctx.translate(t.x,t.y+11);ctx.rotate(-Math.PI/3);
         ctx.textAlign="right";ctx.font='600 13px "Rubik",system-ui,sans-serif';
         ctx.fillText(t.label,-1,1);ctx.restore();
       }else{ctx.textAlign="center";ctx.fillText(t.label,t.x,t.y+16);}
-    }else{
+    }else if(t.kind==="y"){
       ctx.moveTo(t.x-5,t.y);ctx.lineTo(t.x+5,t.y);ctx.stroke();
       ctx.textAlign="right";ctx.fillText(t.label,t.x-9,t.y);
+    }else{
+      // Tick is perpendicular to the 45° ray; label sits on the same side.
+      const nx=-t.uy,ny=t.ux;
+      ctx.moveTo(t.x-nx*5,t.y-ny*5);ctx.lineTo(t.x+nx*5,t.y+ny*5);ctx.stroke();
+      ctx.textAlign="center";
+      const offset=11+(t.label.length>2?5:0);
+      ctx.fillText(t.label,t.x+nx*offset,t.y+ny*offset);
     }
   });
   if(s.axisName==="x"){
@@ -827,7 +842,7 @@ function drawStroke(ctx,s){
       ctx.fillText(s.axisName,p[3]+(dx/L)*15+4,p[4]+(dy/L)*15-4);
     }
   }
-  if(s.axisName==="x"||s.axisName==="y")drawAxisScale(ctx,s);
+  if(["x","y","z"].includes(s.axisName))drawAxisScale(ctx,s);
   ctx.restore();
 }
 function arrowHead(ctx,x0,y0,x1,y1,L,Hh){ const a=Math.atan2(y1-y0,x1-x0); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1-Math.cos(a)*L+Math.sin(a)*Hh, y1-Math.sin(a)*L-Math.cos(a)*Hh); ctx.lineTo(x1-Math.cos(a)*L-Math.sin(a)*Hh, y1-Math.sin(a)*L+Math.cos(a)*Hh); ctx.closePath(); ctx.fill(); }
@@ -1114,6 +1129,11 @@ Object.assign(I18N.en,{smartInkHint:"Auto-snapped X/Y axes include one tick per 
 Object.assign(I18N.de,{smartInkHint:"X/Y-Achsen mit Teilstrichen pro Karofeld. Zahl gedrückt halten, um die Schrittweite zu ändern.",scratchEraseHint:"Mit einer schnellen durchgehenden Bewegung unter einer Sekunde bestehende Striche mindestens viermal kreuzen. Nur gekreuzte Objekte werden gelöscht."});
 /* v23: clarify experimental recognition and new always-erasable calligraphy. */
 Object.assign(I18N.ru,{calligHint:"Пишет красивые отдельные буквы и цифры (цифры — рукописным шрифтом). Сильно неровный почерк сначала сглаживается; сомнительное распознавание не удаляет исходную запись. Любую заменённую букву можно стереть обычным ластиком.",smartInkHint:"Две длинные линии, пересекающиеся как крест, превращаются в оси X/Y со стрелками и привязкой к сетке. Стрелочки, дорисованные в конце, допустимы."});
+/* v25: the pen instructions now describe all three scaled axes and dense erasing. */
+Object.assign(I18N.ru,{smartInkHint:"Нарисуй X/Y как крест, затем диагональ из их пересечения — ось Z будет направлена ВЛЕВО под 45°, даже если рисуешь вправо. Все оси привязываются к клеткам, получают числа. Удерживай число, чтобы поменять общий шаг.",scratchEraseHint:"Быстро зачеркни запись одним непрерывным движением (4 пересечения) или плотно закрась её туда-обратно. Закрашивание допускает до 2,4 секунды. Соседние штрихи не стираются без прямого касания."});
+Object.assign(I18N.uk,{smartInkHint:"Намалюйте X/Y хрестом, потім діагональ від їх перетину: Z автоматично спрямовується ЛІВОРУЧ під 45°. Числа є на всіх трьох осях; утримуйте число для зміни кроку.",scratchEraseHint:"Одним безперервним швидким жестом перетніть лінію 4 рази або густо заштрихуйте її; сусідні елементи не стираються без дотику."});
+Object.assign(I18N.en,{smartInkHint:"Draw X/Y as a cross, then a diagonal from the intersection: the Z axis automatically points LEFT at 45°, even if your stroke went right. All three axes snap to the grid and get numbered ticks; long-press a number to change their shared step.",scratchEraseHint:"Cross ink four times in one quick stroke, or densely scrub over it in one gesture (up to 2.4 seconds). Only directly touched items are erased."});
+Object.assign(I18N.de,{smartInkHint:"X/Y als Kreuz zeichnen, dann eine Diagonale vom Schnittpunkt: die Z-Achse zeigt automatisch nach LINKS (45°). Alle drei Achsen rasten am Raster ein und erhalten Teilstriche; eine Zahl gedrückt halten für die Schrittweite.",scratchEraseHint:"In einem schnellen, ununterbrochenen Zug viermal kreuzen oder dicht über die Tinte kritzeln (bis 2,4 Sekunden). Nur direkt berührte Objekte werden gelöscht."});
 Object.assign(I18N.uk,{calligHint:"Покращення окремих рукописних літер та цифр; ненадійні результати залишаються рукописними. Перетворені символи стираються звичайною гумкою."});
 Object.assign(I18N.en,{calligHint:"Beautify individual handwritten letters and digits, while keeping uncertain strokes. Recognized characters can be erased with the normal eraser."});
 Object.assign(I18N.de,{calligHint:"Einzelne handgeschriebene Buchstaben und Ziffern glätten. Unsichere Zeichen bleiben im Original. Die normale Radierfunktion entfernt auch erkannte Zeichen."});
@@ -1411,7 +1431,11 @@ async function openNb(m,fresh){
   if(S.nb!==m) return;
   const pinfo=m.pinfo||{};
   S.pages=m.pages.map(id=>Object.assign({id,strokes:(stored[id]||[]).map(decItem).filter(Boolean)},pinfo[id]||{}));
-  for(const pg of S.pages)if(upgradeAxisLabels(pg))dirty.add(pg);
+  for(const pg of S.pages){
+    const labelsUpdated=upgradeAxisLabels(pg);
+    const zMovedLeft=upgradeZToLeft(pg);
+    if(labelsUpdated||zMovedLeft)dirty.add(pg);
+  }
   if(dirty.size)scheduleSave();
   if(!S.pages.length){ S.pages.push(newPage()); metaDirty=true; }
   for(const pg of S.pages) autoGrow(pg,true);
@@ -1993,42 +2017,279 @@ function upgradeAxisLabels(pg){
   }
   return changed;
 }
+/* v26: Migrate old right-facing Z axes non-destructively when a notebook opens.
+   Old scale, color, stroke thickness, ticks and XY axes are preserved. */
+function upgradeZToLeft(pg){
+  let changed=false;
+  pg.strokes=pg.strokes.map(it=>{
+    if(!it||it.axisName!=="z"||!Array.isArray(it.axisOrigin)||
+       !Array.isArray(it.p)||it.p.length!==6||it.p[3]<=it.axisOrigin[0]+.5)return it;
+    const x=it.axisOrigin[0],copy=cloneItem(it);
+    copy.p=[2*x-it.p[0],it.p[1],it.p[2],2*x-it.p[3],it.p[4],it.p[5]];
+    changed=true;
+    return copy;
+  });
+  return changed;
+}
 function lineDirection(it){
   const sp=axisSpine(it);
   if(sp)return {it,dx:sp.kind==="x"?sp.high-sp.low:0,dy:sp.kind==="y"?sp.high-sp.low:0,
     len:sp.len,ends:sp.kind==="x"?[[sp.low,sp.mid],[sp.high,sp.mid]]:[[sp.mid,sp.low],[sp.mid,sp.high]]};
-  if(!it||it.t!=="p"||!it.p||it.p.length<6)return null;
-  const p=it.p,dx=p[p.length-3]-p[0],dy=p[p.length-2]-p[1],len=Math.hypot(dx,dy);
-  return len>75?{it,dx,dy,len,ends:[[p[0],p[1]],[p[p.length-3],p[p.length-2]]]}:null;
+  const pts=axisCandidatePoints(it);if(pts.length<2)return null;
+  const a=pts[0],b=pts[pts.length-1],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
+  return len>65?{it,dx,dy,len,ends:[a,b]}:null;
 }
+function axisCandidatePoints(it){
+  if(!it||it.axisName||!(["p","b","g"].includes(it.t)))return [];
+  if(it.t==="g"){
+    const q=it.pts||[],out=[];
+    for(let i=0;i+1<q.length;i+=2)if(Number.isFinite(q[i])&&Number.isFinite(q[i+1]))out.push([q[i],q[i+1]]);
+    return out;
+  }
+  return inkPoints(it);
+}
+function zAxisFit(it,origin,pg){
+  // Detect a deliberate diagonal through/from the existing origin. Supports
+  // straight Pencil strokes and shafts with a short hand-drawn arrowhead.
+  const pts=axisCandidatePoints(it),cell=axisGridCell(pg);
+  if(pts.length<2)return null;
+  let far=null,maxDist=0;
+  for(const q of pts){const d=Math.hypot(q[0]-origin[0],q[1]-origin[1]);if(d>maxDist){maxDist=d;far=q;}}
+  if(maxDist<Math.max(70,cell*2.05))return null;
+  const dx=far[0]-origin[0],dy=far[1]-origin[1],ratio=Math.min(Math.abs(dx),Math.abs(dy))/Math.max(Math.abs(dx),Math.abs(dy));
+  if(ratio<.52)return null; // Within ~18 degrees of 45/135/225/315.
+  const sx=Math.sign(dx),sy=Math.sign(dy),u=[sx/Math.SQRT2,sy/Math.SQRT2];
+  let nearest=Infinity,nearPoint=false,positive=-Infinity,negative=Infinity,inliers=0;
+  for(const q of pts){
+    const xx=q[0]-origin[0],yy=q[1]-origin[1],d=Math.hypot(xx,yy);
+    nearest=Math.min(nearest,d);
+    const along=(xx*sx+yy*sy)/2,perp=Math.abs(xx*sx-yy*sy)/Math.SQRT2;
+    if(perp<Math.max(13,Math.min(25,maxDist*.085)))inliers++;
+    if(perp<Math.max(14,Math.min(26,maxDist*.12))){positive=Math.max(positive,along);negative=Math.min(negative,along);}
+  }
+  if(inliers/pts.length<.62)return null;
+  // Require the ink to reach the origin, or actually run across it;
+  // a parallel diagonal nearby must not steal an existing coordinate system.
+  const direct=Math.max(22,cell*.8);
+  if(nearest>direct){
+    const first=pts[0],last=pts[pts.length-1];
+    const d=segDist(origin[0],origin[1],first[0],first[1],last[0],last[1]);
+    const dot=(origin[0]-first[0])*(last[0]-first[0])+(origin[1]-first[1])*(last[1]-first[1]);
+    const length2=Math.pow(last[0]-first[0],2)+Math.pow(last[1]-first[1],2);
+    if(d>cell*.52||dot<0||dot>length2)return null;
+  }
+  // Hand-drawn endpoint may be off-grid. Snap the accepted shaft to a clean
+  // 45° grid diagonal and keep the negative half if the stroke crosses origin.
+  const n1=Math.max(2,Math.round(positive/cell));
+  const n0=Math.min(0,Math.round(negative/cell));
+  // v26: Always place the POSITIVE Z ray to the LEFT of Y. Reflect a
+  // right-facing input about the vertical Y axis; keep its up/down slant.
+  // Thus a drawn down-right diagonal becomes down-left (and up-right -> up-left).
+  // The recognizer still accepts either drawing direction, so the Pencil motion
+  // need not be exact. Grid spacing, signed ticks and arrow tip are preserved.
+  const leftSx=-1;
+  const p0=[origin[0]+n0*leftSx*cell,origin[1]+n0*sy*cell];
+  const p1=[origin[0]+n1*leftSx*cell,origin[1]+n1*sy*cell];
+  if(Math.hypot(p1[0]-p0[0],p1[1]-p0[1])<Math.max(75,2*cell))return null;
+  return {p0,p1,score:nearest+Math.abs(Math.abs(dx)-Math.abs(dy))*.1};
+}
+function tryAttachZAxis(pg,latest){
+  if(!pg||!latest||!pg.strokes.includes(latest)||latest.axisName)return false;
+  let best=null;
+  for(const x of pg.strokes){
+    if(x.axisName!=="x"||!Array.isArray(x.axisOrigin))continue;
+    const y=pg.strokes.find(z=>z!==x&&z.axisName==="y"&&
+      (x.axisGroup&&z.axisGroup===x.axisGroup ||
+       Array.isArray(z.axisOrigin)&&Math.hypot(z.axisOrigin[0]-x.axisOrigin[0],z.axisOrigin[1]-x.axisOrigin[1])<2));
+    if(!y)continue;
+    const group=x.axisGroup||y.axisGroup;
+    // A coordinate system has one Z axis: never overwrite an existing one.
+    if(pg.strokes.some(z=>z.axisName==="z"&&((group&&z.axisGroup===group)||
+      (!group&&Array.isArray(z.axisOrigin)&&Math.hypot(z.axisOrigin[0]-x.axisOrigin[0],z.axisOrigin[1]-x.axisOrigin[1])<3))))continue;
+    const fit=zAxisFit(latest,x.axisOrigin,pg);
+    if(fit&&(!best||fit.score<best.fit.score))best={x,y,fit,group};
+  }
+  if(!best)return false;
+  const before=pg.strokes.slice(),idx=pg.strokes.indexOf(latest);
+  const origin=best.x.axisOrigin.slice();
+  const axisGroup=best.group||uid();
+  if(!best.group){ // Older crosses may not yet have a shared group.
+    for(const old of [best.x,best.y]){const k=pg.strokes.indexOf(old);
+      if(k>=0)pg.strokes[k]={...cloneItem(old),axisGroup,axisOrigin:origin.slice()};}
+  }
+  const {p0,p1}=best.fit;
+  pg.strokes[idx]={t:"p",c:latest.c,w:latest.w||PEN_W[S.penW],
+    p:[p0[0],p0[1],.5,p1[0],p1[1],.5],axisName:"z",autoLine:Date.now(),
+    axisOrigin:origin,axisGroup,axisCell:best.x.axisCell||axisGridCell(pg),
+    axisStep:Number(best.x.axisStep)>0?best.x.axisStep:1};
+  redraw(pg);commitPage(pg,before);return true;
+}
+/* v28: A handwritten equals sign is recognised either as TWO successive, independent short pen
+   strokes. We inspect their ORIGINAL Pencil samples, not the Smart Ink lines
+   already snapped onto graph-paper rules. The completed = is centered inside
+   a grid square, with both bars kept as genuine erasable/exportable ink. */
+function equalBarSource(stroke,pg){
+  if(!stroke||!(["p","b"].includes(stroke.t)))return null;
+  const pts=inkPoints(stroke);if(pts.length<2)return null;
+  const first=pts[0],last=pts[pts.length-1],dx=last[0]-first[0],dy=last[1]-first[1];
+  const len=Math.hypot(dx,dy),cell=axisGridCell(pg);
+  // A handwriting dash and a two-cell dash are allowed, long coordinate
+  // axes are not. The second small line must be genuinely horizontal.
+  if(len<10||len>Math.max(88,cell*4.0)||Math.abs(dy)>Math.max(3.5,len*.21))return null;
+  let maxError=0,pathLength=0;
+  for(let i=0;i<pts.length;i++){
+    const q=pts[i];
+    maxError=Math.max(maxError,segDist(q[0],q[1],first[0],first[1],last[0],last[1]));
+    if(i)pathLength+=Math.hypot(q[0]-pts[i-1][0],q[1]-pts[i-1][1]);
+  }
+  if(maxError>Math.max(4.0,len*.14)||pathLength>len*1.38)return null;
+  return {x0:Math.min(first[0],last[0]),x1:Math.max(first[0],last[0]),
+    cx:(first[0]+last[0])/2,cy:(first[1]+last[1])/2,len};
+}
+function equalCellCenterY(pg,y,cell){
+  const paper=pagePaper(pg),base=(paper==="lined"||paper==="cornell")?30*MM:0;
+  return base+(Math.floor((y-base)/cell)+.5)*cell;
+}
+function equalCellCenterX(pg,x,cell){
+  // Plain ruled sheets have no vertical square lines; preserve the center x.
+  const paper=pagePaper(pg);
+  if(!["grid","dots","mm"].includes(paper))return x;
+  return (Math.floor(x/cell)+.5)*cell;
+}
+function equalOneStrokeSource(stroke,pg){
+  if(!stroke||!( ["p","b"].includes(stroke.t) ))return null;
+  const pts0=inkPoints(stroke);if(pts0.length<5)return null;
+  const pts=[pts0[0]];
+  for(let i=1;i<pts0.length;i++){
+    const p=pts0[i],q=pts[pts.length-1];
+    if(Math.hypot(p[0]-q[0],p[1]-q[1])>=1.2)pts.push(p);
+  }
+  if(pts.length<5)return null;
+  let minX=pts[0][0],maxX=pts[0][0],minY=pts[0][1],maxY=pts[0][1],path=0;
+  for(let i=1;i<pts.length;i++){
+    const p=pts[i]; minX=Math.min(minX,p[0]); maxX=Math.max(maxX,p[0]); minY=Math.min(minY,p[1]); maxY=Math.max(maxY,p[1]);
+    path+=Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1]);
+  }
+  const w=maxX-minX,h=maxY-minY,cell=pagePaper(pg)==="mm"?5*MM:axisGridCell(pg);
+  if(w<12||w>Math.max(cell*2.3,92)||h<4||h>Math.max(cell*.95,26)||path<w*1.45)return null;
+  const diffs=[];
+  const norm=a=>{while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;};
+  for(let k=2;k<pts.length-2;k++){
+    const a1=Math.atan2(pts[k][1]-pts[k-2][1],pts[k][0]-pts[k-2][0]);
+    const a2=Math.atan2(pts[k+2][1]-pts[k][1],pts[k+2][0]-pts[k][0]);
+    diffs.push({k,d:Math.abs(norm(a2-a1))});
+  }
+  diffs.sort((a,b)=>b.d-a.d);
+  let corners=[];
+  for(const c of diffs){
+    if(c.d<0.42)break;
+    if(corners.every(v=>Math.abs(v-c.k)>2))corners.push(c.k);
+    if(corners.length===2)break;
+  }
+  if(corners.length<2)return null;
+  corners.sort((a,b)=>a-b);
+  const [i,j]=corners;
+  if(i<1||j>=pts.length-1||j-i<1)return null;
+  const segments=[pts.slice(0,i+1),pts.slice(i,j+1),pts.slice(j)];
+  const stats=segments.map(seg=>{
+    const s=seg[0],e=seg[seg.length-1];
+    const dx=e[0]-s[0],dy=e[1]-s[1],len=Math.hypot(dx,dy);
+    let plen=0,err=0;
+    for(let t=1;t<seg.length;t++)plen+=Math.hypot(seg[t][0]-seg[t-1][0],seg[t][1]-seg[t-1][1]);
+    for(const q of seg)err=Math.max(err,segDist(q[0],q[1],s[0],s[1],e[0],e[1]));
+    return {s,e,dx,dy,len,plen,err};
+  });
+  const [s1,s2,s3]=stats;
+  const h1=s1.len>=8 && Math.abs(s1.dy)<=Math.max(3.5,s1.len*.28) && s1.err<=Math.max(4.5,s1.len*.18) && s1.plen<=s1.len*1.5;
+  const h3=s3.len>=8 && Math.abs(s3.dy)<=Math.max(3.5,s3.len*.28) && s3.err<=Math.max(4.5,s3.len*.18) && s3.plen<=s3.len*1.5;
+  const diag=s2.len>=4 && Math.abs(s2.dx)>=4 && Math.abs(s2.dy)>=3 && Math.abs(s2.dy)<=Math.max(h*1.2,20);
+  if(!(h1&&h3&&diag))return null;
+  const horizShare=(s1.len+s3.len)/(path||1);
+  if(horizShare<0.54)return null;
+  const ysep=Math.abs((s1.s[1]+s1.e[1])/2-(s3.s[1]+s3.e[1])/2);
+  if(ysep<Math.max(4,cell*.14)||ysep>Math.max(20,cell*.9))return null;
+  if(Math.max(s1.len,s3.len)/Math.max(1,Math.min(s1.len,s3.len))>2.2)return null;
+  // Must fit like a compact math sign, not a full handwritten Z character.
+  if(h>cell*.82 || w>cell*2.1) return null;
+  // The diagonal connector should merely link the two bars, not dominate.
+  if(s2.len > (s1.len+s3.len)*0.9) return null;
+  const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+  return {cx,cy,width:Math.min(Math.max((s1.len+s3.len)/2,cell*.58),cell*1.35),cell};
+}
+function tryCommitEquals(pg,raw,item){
+  if(!pg||!item||item.axisName||item.eqGroup)return false;
+  const cell=pagePaper(pg)==="mm"?5*MM:axisGridCell(pg),now=Date.now();
+  const one=equalOneStrokeSource(raw,pg);
+  if(one){
+    const before=pg.strokes.slice(),group=uid();
+    const cx=equalCellCenterX(pg,one.cx,cell),cy=equalCellCenterY(pg,one.cy,cell);
+    const width=one.width,halfGap=cell*.18;
+    const mk=y=>({t:"p",c:item.c,w:item.w,p:[cx-width/2,y,.5,cx+width/2,y,.5],autoLine:now,eqGroup:group,eqSign:true});
+    pg.strokes.push(mk(cy-halfGap),mk(cy+halfGap));
+    redraw(pg);commitPage(pg,before);lastSmartInk=null;
+    return true;
+  }
+  const b=equalBarSource(raw,pg);if(!b)return false;
+  
+  let matched=null;
+  for(let i=pg.strokes.length-1;i>=Math.max(0,pg.strokes.length-16);i--){
+    const old=pg.strokes[i];
+    if(!old||old.axisName||old.eqGroup||!old.eqSource||old.c!==item.c)continue;
+    const [ox0,ox1,oy,when]=old.eqSource;
+    if(now-when>30000||when>now+1000)continue;
+    const len=ox1-ox0,vertical=Math.abs(b.cy-oy);
+    if(len<9||vertical<Math.max(3.3,cell*.14)||vertical>Math.max(16,cell*1.15))continue;
+    if(vertical>Math.max(len,b.len)*.95)continue;
+    if(Math.max(len,b.len)/Math.min(len,b.len)>2.25)continue;
+    if(Math.abs((ox0+ox1)/2-b.cx)>Math.max(8,Math.min(len,b.len)*.30))continue;
+    const overlap=Math.min(ox1,b.x1)-Math.max(ox0,b.x0);
+    if(overlap<Math.min(len,b.len)*.55)continue;
+    // A = has two bars stacked above/below, not a line retraced in place.
+    const score=vertical+Math.abs((ox0+ox1)/2-b.cx)*.6+(now-when)/10000;
+    if(!matched||score<matched.score)matched={i,old,oy,len,score};
+  }
+  if(!matched)return false;
+  const before=pg.strokes.slice(),group=uid();
+  const avgx=((matched.old.eqSource[0]+matched.old.eqSource[1])/2+b.cx)/2;
+  const avgy=(matched.oy+b.cy)/2;
+  const cx=equalCellCenterX(pg,avgx,cell),cy=equalCellCenterY(pg,avgy,cell);
+  const paper=pagePaper(pg),onGrid=["grid","dots","mm"].includes(paper);
+  const width=onGrid?cell*.72:Math.min(Math.max((matched.len+b.len)/2,cell*.6),cell*1.4);
+  const halfGap=cell*.18;
+  const mk=(style,y)=>({t:"p",c:style.c,w:style.w,
+    p:[cx-width/2,y,.5,cx+width/2,y,.5],autoLine:now,eqGroup:group,eqSign:true});
+  const upper=mk(matched.oy<b.cy?matched.old:item,cy-halfGap);
+  const lower=mk(matched.oy<b.cy?item:matched.old,cy+halfGap);
+  pg.strokes[matched.i]=matched.oy<b.cy?upper:lower;
+  pg.strokes.push(matched.oy<b.cy?lower:upper);
+  // One undo restores the original first stroke and removes the second.
+  redraw(pg);commitPage(pg,before);lastSmartInk=null;
+  return true;
+}
+function markEqualCandidate(raw,item,pg){
+  if(!item||item.axisName||item.eqGroup)return;
+  const b=equalBarSource(raw,pg);if(!b)return;
+  // Keep the raw first bar across refresh, since Smart Ink otherwise snaps it
+  // onto a grid rule. autoLine ensures JSON encoding retains the hint.
+  item.eqSource=[b.x0,b.x1,b.cy,Date.now()];
+  if(!item.autoLine)item.autoLine=Date.now();
+}
+
 function snapAxes(pg,latest){
   if(!S.smartInk||!pg||!latest||!pg.strokes.includes(latest))return false;
-  // Work even if the most recent stroke is an unrecognized pencil line.
+  // Z is tested against every existing XY system, independently of stroke
+  // shape and the current stylus mode. This also accepts arrow-shaped ink.
+  if(tryAttachZAxis(pg,latest))return true;
   const b=axisSpine(latest);
-  if(!b){
-    // Preserve the third, diagonal Z axis when it begins at an existing X/Y cross.
-    const xs=pg.strokes.find(it=>it.axisName==="x"),ys=pg.strokes.find(it=>it.axisName==="y");
-    if(!xs||!ys||latest.axisName)return false;
-    const xsp=axisSpine(xs),ysp=axisSpine(ys),ln=lineDirection(latest);
-    if(!xsp||!ysp||!ln)return false;
-    const o=[paperSnapX(ysp.mid,pg),paperSnapY(xsp.mid,pg)];
-    const near=ln.ends.reduce((best,p)=>Math.hypot(p[0]-o[0],p[1]-o[1])<Math.hypot(best[0]-o[0],best[1]-o[1])?p:best,ln.ends[0]);
-    const far=ln.ends[0]===near?ln.ends[1]:ln.ends[0];
-    const vx=far[0]-o[0],vy=far[1]-o[1],len=Math.hypot(vx,vy);
-    if(Math.hypot(near[0]-o[0],near[1]-o[1])>30||len<82||Math.min(Math.abs(vx),Math.abs(vy))<len*.27)return false;
-    const before=pg.strokes.slice(),idx=pg.strokes.indexOf(latest);
-    pg.strokes[idx]={t:"p",c:latest.c,w:latest.w||PEN_W[S.penW],p:[o[0],o[1],.5,far[0],far[1],.5],axisName:"z",autoLine:Date.now()};
-    redraw(pg);commitPage(pg,before);return true;
-  }
+  if(!b||latest.axisName)return false;
   const before=pg.strokes.slice();
   let pair=null;
   for(let i=pg.strokes.length-2;i>=Math.max(0,pg.strokes.length-100);i--){
     const old=pg.strokes[i],a=axisSpine(old);
-    if(!a||a.kind===b.kind)continue;
+    if(!a||a.kind===b.kind||old.axisName)continue;
     const xl=a.kind==="x"?a:b,yl=a.kind==="y"?a:b;
     const o=axisIntersection(xl,yl,pg);
     if(!o)continue;
-    // Prefer a nearby cross; a random line a whole page away is not an axis.
     const score=Math.hypot((xl.low+xl.high)/2-o[0],(yl.low+yl.high)/2-o[1]);
     if(!pair||score<pair.score)pair={xl,yl,origin:o,score};
   }
@@ -2045,12 +2306,11 @@ function snapAxes(pg,latest){
     }else{
       x0=x1=origin[0];y0=paperSnapY(sp.high,pg);y1=paperSnapY(sp.low,pg);
     }
-    const nd={t:"p",c:it.c,w:it.w||PEN_W[S.penW],p:[x0,y0,.5,x1,y1,.5],
-      axisName:sp.kind,autoLine:it.autoLine||Date.now(),axisOrigin:origin.slice(),axisStep:1,axisCell:cell,axisGroup:group};
-    pg.strokes[index]=nd;
+    pg.strokes[index]={t:"p",c:it.c,w:it.w||PEN_W[S.penW],p:[x0,y0,.5,x1,y1,.5],
+      axisName:sp.kind,autoLine:it.autoLine||Date.now(),axisOrigin:origin.slice(),axisStep:1,
+      axisCell:cell,axisGroup:group};
   };
   put(xl);put(yl);
-  // One atomic undo step converts the two raw strokes into a snapped coordinate cross.
   redraw(pg);commitPage(pg,before);
   return true;
 }
@@ -2059,19 +2319,34 @@ function snapAxes(pg,latest){
    pre-existing ink at four *distinct geometric points*. It cannot accumulate
    separate pen strokes or erase neighbours that merely share a bounding box. */
 function eraseGestureMetrics(points,elapsed){
-  if(points.length<6||elapsed>1000||elapsed<65)return null;
-  const rs=resample(points,Math.min(120,Math.max(32,points.length*2)));
-  if(!rs||rs.tot<92||rs.tot/Math.max(elapsed,1)<.14)return null;
+  // Never merge several strokes: the pen must stay down. Very dense fill-in
+  // gestures may take up to 2.4 s, whereas an ordinary cross must be <=1.1 s.
+  if(points.length<6||elapsed>2400||elapsed<65)return null;
+  const rs=resample(points,Math.min(160,Math.max(48,points.length*2)));
+  if(!rs||rs.tot<95||rs.tot/Math.max(elapsed,1)<.105)return null;
   let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
   const path=rs.out;
   for(const [x,y] of path){minx=Math.min(minx,x);maxx=Math.max(maxx,x);miny=Math.min(miny,y);maxy=Math.max(maxy,y);}
-  const diag=Math.hypot(maxx-minx,maxy-miny);
-  if(diag<18||rs.tot/Math.max(diag,1)<1.9)return null;
-  // A single writing line or axis should never be an eraser.
+  const diag=Math.hypot(maxx-minx,maxy-miny),fillRatio=rs.tot/Math.max(diag,1);
+  if(diag<16||fillRatio<1.9)return null;
   const first=path[0],last=path[path.length-1];
-  const endDist=Math.hypot(last[0]-first[0],last[1]-first[1]);
-  if(endDist>rs.tot*.85)return null;
-  return {path,bb:[minx,miny,maxx,maxy],time:elapsed};
+  if(Math.hypot(last[0]-first[0],last[1]-first[1])>rs.tot*.79)return null;
+  let turns=0;
+  for(let i=3;i<path.length;i++){
+    const a=path[i-3],b=path[i-2],c=path[i-1],d=path[i];
+    const u=[b[0]-a[0],b[1]-a[1]],v=[d[0]-c[0],d[1]-c[1]];
+    const un=Math.hypot(...u),vn=Math.hypot(...v);
+    if(un>1&&vn>1&&(u[0]*v[0]+u[1]*v[1])/(un*vn)<-.3)turns++;
+  }
+  // Count separate crossings of this one gesture with itself. Neighboring
+  // samples along the same segment do not count as a crossing.
+  let selfHits=0;
+  for(let i=1;i<path.length&&selfHits<20;i+=2)
+    for(let j=1;j<i-8&&selfHits<20;j+=2)
+      if(crossingPoint(path[i-1],path[i],path[j-1],path[j]))selfHits++;
+  const dense=fillRatio>=3.0&&rs.tot>=155&&(turns>=3||selfHits>=2);
+  if(!dense&&elapsed>1100)return null;
+  return {path,bb:[minx,miny,maxx,maxy],time:elapsed,dense,fillRatio,turns,selfHits};
 }
 function crossingPoint(a,b,c,d){
   const rx=b[0]-a[0],ry=b[1]-a[1],sx=d[0]-c[0],sy=d[1]-c[1];
@@ -2113,20 +2388,42 @@ function scratchErase(a,points){
   if(!g)return false;
   const before=pg.strokes.slice(),groups=[],all=[];
   for(const it of before){
-    if(it.t==="i")continue;
+    if(it.t==="i")continue; // PDF/photos are intentionally never erased.
     const b=bbox(it),q=g.bb;
-    // No large hit radius: adjacent strokes are never selected by proximity alone.
-    if(b[2]<q[0]||b[0]>q[2]||b[3]<q[1]||b[1]>q[3])continue;
-    const events=distinctCrossings(g.path,inkSegments(it));
-    if(!events.length)continue;
-    groups.push({it,events});
-    for(const pt of events){
-      if(!all.some(z=>Math.hypot(z[0]-pt[0],z[1]-pt[1])<5))all.push(pt);
+    if(b[2]+3<q[0]||b[0]-3>q[2]||b[3]+3<q[1]||b[1]-3>q[3])continue;
+    const segs=inkSegments(it),events=distinctCrossings(g.path,segs);
+    let denseContact=false;
+    if(g.dense&&segs.length){
+      // Repeated contact with *actual ink*, not intersection of bounding boxes.
+      // 3px radius is small enough to spare neighboring ruled lines and letters.
+      const radius=Math.min(4.8,Math.max(2.6,(it.w||2)*.48+1.2));
+      const touches=[];
+      for(let i=0;i<g.path.length;i++){
+        const xy=g.path[i];
+        if(segs.some(([s,e])=>segDist(xy[0],xy[1],s[0],s[1],e[0],e[1])<=radius))touches.push(i);
+      }
+      // Multiple contacts at separated times in the SAME gesture: a single
+      // quick touch of an adjacent mark cannot erase it by accident.
+      const spread=touches.length?touches[touches.length-1]-touches[0]:0;
+      denseContact=touches.length>=Math.max(9,g.path.length*.105)&&spread>=Math.min(20,g.path.length*.14);
+    }else if(g.dense&&it.t==="x"){
+      // Recognized text has no real stroke outline in storage. A densely filled
+      // region inside its *own* box can still erase it, but only with coverage.
+      const hits=g.path.filter(q=>q[0]>=b[0]+2&&q[0]<=b[2]-2&&q[1]>=b[1]+2&&q[1]<=b[3]-2).length;
+      denseContact=hits>=g.path.length*.27;
     }
+    if(!events.length&&!denseContact)continue;
+    groups.push({it,events,denseContact});
+    for(const pt of events){if(!all.some(z=>Math.hypot(z[0]-pt[0],z[1]-pt[1])<5))all.push(pt);}
   }
-  // At least four distinct actual intersections, all from THIS ONE pen stroke.
-  if(all.length<4)return false;
-  const crossed=new Set(groups.map(g=>g.it));
+  // Normal quick cross still requires four distinct geometric intersections.
+  // A deliberately heavy compact scribble can instead erase the specific ink
+  // it repeatedly touched, even when all crossings overlap in one dark blot.
+  if(all.length<4&&!(g.dense&&groups.some(q=>q.denseContact||q.events.length>=2)))return false;
+  // Dense scribble: each object must itself have repeated direct contact or
+  // at least two literal crossings; not the neighbor of a touched object.
+  const crossed=new Set(groups.filter(q=>all.length>=4||q.denseContact||q.events.length>=2).map(q=>q.it));
+  if(!crossed.size)return false;
   pg.strokes=before.filter(it=>!crossed.has(it));
   redraw(pg);commitPage(pg,before);lastSmartInk=null;
   vibrate();toast(tt("gestureErased"),900);return true;
@@ -2176,15 +2473,15 @@ function smartInkEnd(a){
   return remember(s,true);
 }
 
-/* v24 long press any X/Y tick number to edit the entire coordinate scale. */
+/* v25 long press any X/Y/Z tick number to edit the entire coordinate scale. */
 function axisLabelTarget(pg,x,y){
   let best=null,minDist=18;
   for(const it of pg.strokes){
     if(!axisGeometry(it))continue;
     axisTicks(it,t=>{
       const tilted=t.kind==="x"&&t.label.length>2;
-      const tx=t.kind==="x"?(tilted?t.x-7:t.x):t.x-10;
-      const ty=t.kind==="x"?(tilted?t.y+24:t.y+16):t.y;
+      const tx=t.kind==="x"?(tilted?t.x-7:t.x):t.kind==="z"?t.x-t.uy*13:t.x-10;
+      const ty=t.kind==="x"?(tilted?t.y+24:t.y+16):t.kind==="z"?t.y+t.ux*13:t.y;
       const width=tilted?21:Math.min(74,Math.max(12,t.label.length*8));
       const dx=Math.max(0,Math.abs(x-tx)-width/2),dy=Math.max(0,Math.abs(y-ty)-10);
       const d=Math.hypot(dx,dy);
@@ -2197,10 +2494,10 @@ function axisEditStep(pg,source){
   if(!pg||!pg.strokes.includes(source))return;
   const existing=document.getElementById("axisStepDialog");if(existing)existing.remove();
   const translations={
-    ru:["Шаг делений", "Каждая клетка остаётся одним делением. Изменятся только значения на осях X/Y.","Новый шаг (например 50)","Отмена","Применить","Введите число больше нуля"],
+    ru:["Шаг делений", "Каждая клетка остаётся одним делением. Изменятся только значения на осях X/Y/Z.","Новый шаг (например 50)","Отмена","Применить","Введите число больше нуля"],
     uk:["Крок поділок","Одна клітинка — одна поділка. Значення на осях зміняться.","Новий крок (наприклад 50)","Скасувати","Застосувати","Введіть додатне число"],
-    de:["Achsenschritt", "Ein Kästchen bleibt eine Teilung. Nur die Werte ändern sich.","Schrittweite (z. B. 50)","Abbrechen","Übernehmen","Bitte eine positive Zahl eingeben"],
-    en:["Axis value step","Each grid cell stays one tick. Only the X/Y numbers change.","New step (for example 50)","Cancel","Apply","Enter a positive number"]
+    de:["Achsenschritt", "Ein Kästchen bleibt eine Teilung. Nur die Werte auf X/Y/Z ändern sich.","Schrittweite (z. B. 50)","Abbrechen","Übernehmen","Bitte eine positive Zahl eingeben"],
+    en:["Axis value step","Each grid cell stays one tick. Only the X/Y/Z numbers change.","New step (for example 50)","Cancel","Apply","Enter a positive number"]
   };const T=translations[LANG]||translations.en;
   const outer=h("div",{id:"axisStepDialog",class:"axis-step-overlay",role:"dialog","aria-modal":"true"});
   const panel=h("div",{class:"axis-step-panel"});
@@ -2213,7 +2510,7 @@ function axisEditStep(pg,source){
     const group=source.axisGroup,origin=source.axisOrigin;
     const before=pg.strokes.slice();let changed=false;
     pg.strokes=pg.strokes.map(it=>{
-      if(!["x","y"].includes(it.axisName))return it;
+      if(!["x","y","z"].includes(it.axisName))return it;
       const same=group?it.axisGroup===group:(Array.isArray(origin)&&Array.isArray(it.axisOrigin)&&Math.hypot(origin[0]-it.axisOrigin[0],origin[1]-it.axisOrigin[1])<2);
       if(!same)return it;
       changed=true;return {...cloneItem(it),axisStep:step};
@@ -2291,7 +2588,15 @@ pagesEl.addEventListener("pointermove",(e)=>{
   const a=act; if(!a||e.pointerId!==a.id) return;
   const [x,y]=localPt(e,a.rect,a.pg);
   switch(a.mode){
-    case "axisHold":if(Math.hypot(e.clientX-a.cx,e.clientY-a.cy)>12){clearTimeout(a.holdT);act=null;}return;
+    case "axisHold":if(Math.hypot(e.clientX-a.cx,e.clientY-a.cy)>12){
+      // A number label is also a valid starting point for drawing Z. A drag
+      // cancels the hold but MUST continue as ink; v24 silently lost this stroke.
+      clearTimeout(a.holdT);
+      if(a.fingerNav){act=null;return;}
+      ensureCanvas(a.pg);
+      startTool(a,{clientX:a.cx,clientY:a.cy,pointerType:e.pointerType,pressure:e.pressure||.5});
+      moveTool(a,e,x,y);
+    }return;
     case "cand": if(Math.hypot(e.clientX-a.cx,e.clientY-a.cy)>8){ clearTimeout(a.timer); if(a.fingerNav){ act=null; return; } if(S.tool==="ln") lineStart(a); else shapeStart(a); moveTool(a,e,x,y); } return;
     default: moveTool(a,e,x,y);
   }
@@ -2321,12 +2626,16 @@ function endPointer(e){
     case "stroke": {
       // Some iPad Pencil gestures deliver only pointerdown + pointerup. Capture the
       // release position so even the quickest single-stroke line has two points.
-      if(up&&(S.smartInk||S.scratchErase)&&S.tool==="pen"&&!a.rec) addStrokePt(a,e);
+      if(up&&S.tool==="pen"&&!a.rec) addStrokePt(a,e);
       if(!up&&!a.rec&&a.stroke.p.length<6) return;
       // In handwriting mode, preserve actual letter strokes; shape correction
       // and destructive gestures must not run on the same contact.
       let it=up&&(S.smartInk||S.scratchErase)&&S.tool==="pen"?smartInkEnd(a):a.rec||a.stroke;
       if(it){
+        if(up&&S.tool==="pen"&&!a.rec){
+          if(tryCommitEquals(a.pg,a.stroke,it))return;
+          markEqualCandidate(a.stroke,it,a.pg);
+        }
         commitAdd(a.pg,it);
         if(up&&S.smartInk) snapAxes(a.pg,it);
       } return;
