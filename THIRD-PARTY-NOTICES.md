@@ -267,3 +267,8 @@ Apache License
 
    END OF TERMS AND CONDITIONS
 ```
+
+
+## Dynamically loaded recognition engine (v19)
+
+Tesseract.js v5 (Apache-2.0), Tesseract OCR engine and language models are fetched from external CDNs only when the user enables and uses the recognition feature. These external runtime dependencies are not distributed inside this ZIP. Tesseract.js: https://github.com/naptha/tesseract.js. Language data: https://github.com/tesseract-ocr/tessdata_fast. Font licensing is managed by Google Fonts at the time of download.

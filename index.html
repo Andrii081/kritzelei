@@ -22,6 +22,7 @@
 <title>Kritzelei</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa+Ink&family=Ma+Shan+Zheng&family=Yuji+Syuku&family=Nanum+Pen+Script&display=swap">
 <script src="jspdf.umd.min.js"></script>
 <style>
 /* Layout: a cool blue-grey desk; notebooks lie on it as paper with coloured spines; the open notebook is a full-screen workspace: two toolbar rows over a zoomable scroller of A4 sheets. */
@@ -56,6 +57,10 @@ button{touch-action:manipulation;cursor:pointer}
 #lib{max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
 .libhead{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;justify-content:space-between}
 .brand{font-family:var(--f-display);font-size:56px;line-height:.9;font-weight:700;letter-spacing:.5px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-mark{width:65px;height:65px;border-radius:17px;object-fit:cover;flex:none;box-shadow:0 4px 14px -6px var(--paper-shadow)}
+.brand-copy{display:flex;flex-direction:column;min-width:0}
+.brand-copy > span{overflow-wrap:anywhere}
 .brand small{display:block;font-family:var(--f-ui);font-size:13px;font-weight:400;color:var(--muted);letter-spacing:0;margin-top:6px}
 .libactions{display:flex;flex-wrap:wrap;gap:8px}
 .libtools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -224,7 +229,7 @@ button{touch-action:manipulation;cursor:pointer}
 #scroller{direction:ltr}
 [dir="rtl"] #backBtn svg{transform:scaleX(-1)}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
-@media (max-width:520px){.brand{font-size:46px}#grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px}#pvGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.brand{font-size:46px}.brand-mark{width:51px;height:51px;border-radius:13px}#grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px}#pvGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* Document scanner: dark full-screen editor with the photo, the detected sheet outline and draggable corners */
 #scan{position:fixed;inset:0;z-index:40;background:#15181d;color:#eef1f6;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);touch-action:none;-webkit-user-select:none;user-select:none}
 .scanbar{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
@@ -243,6 +248,12 @@ button{touch-action:manipulation;cursor:pointer}
 #scan .seg button{color:#eef1f6}
 #scan .seg button[aria-pressed="true"]{background:#2f5bea;color:#fff}
 .scanhint{color:#b7bfcc;font-size:14px;flex:1 1 260px}
+
+/* v19 calligraphy recognition review: safe iPad-size controls */
+.callig-review{position:fixed;inset:0;z-index:15000;background:rgba(8,20,43,.48);display:flex;justify-content:center;align-items:center;padding:18px;box-sizing:border-box}
+.callig-panel{width:min(520px,100%);background:var(--raise);color:var(--ink);border:1px solid var(--line);box-shadow:0 20px 65px rgba(0,0,0,.27);border-radius:16px;padding:18px;display:grid;gap:12px;box-sizing:border-box}
+.callig-panel label{font-weight:600}.callig-panel textarea{width:100%;min-height:72px;box-sizing:border-box;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:12px;resize:vertical;font-size:22px;touch-action:auto}
+.callig-panel .callig-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.callig-panel button{min-height:42px}
 </style>
 </head>
 <body>
@@ -251,7 +262,7 @@ button{touch-action:manipulation;cursor:pointer}
 <div id="app">
 <section id="lib" aria-label="Notebooks" data-i18n-aria-label="nbs">
   <header class="libhead">
-    <div class="brand">Kritzelei<small id="where" data-i18n="openingNbs">Opening notebooks…</small></div>
+    <div class="brand"><img class="brand-mark" src="icon-192.png" alt="" aria-hidden="true"><span class="brand-copy"><span id="brandName">Kritzelei</span><small id="where" data-i18n="openingNbs">Opening notebooks…</small></span></div>
     <div class="libactions">
       <label class="langpick"><span aria-hidden="true">🌐</span><select id="langSel" aria-label="Language" data-i18n-aria-label="language"></select></label>
       <button class="btn" id="pdfImportBtn" type="button"><span data-i18n="importAny">Import PDF / GoodNotes</span></button>
@@ -387,6 +398,15 @@ button{touch-action:manipulation;cursor:pointer}
 <div id="toast" role="status" aria-live="polite"></div>
 </div>
 
+<div id="calligReview" class="callig-review" hidden role="dialog" aria-modal="true" aria-labelledby="calligReviewTitle">
+  <div class="callig-panel">
+    <label id="calligReviewTitle" for="calligReviewText"></label>
+    <div id="calligReviewInfo" class="hint"></div>
+    <textarea id="calligReviewText" dir="auto" autocomplete="off" spellcheck="true"></textarea>
+    <div class="callig-actions"><button id="calligKeep" class="btn" type="button"></button><button id="calligApply" class="btn primary" type="button"></button></div>
+  </div>
+</div>
+
 <script>
 (() => {
 "use strict";
@@ -401,7 +421,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v17";
+const APP_VER="v19";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -438,16 +458,40 @@ Object.assign(I18N["zh"],{"smartInk": "自动：手写 / 绘图", "smartInkHint"
 Object.assign(I18N["ja"],{"smartInk": "自動：手書き / 製図", "smartInkHint": "ペンを離すと明確な直線・円弧・図形を整えます。手書き文字はそのまま残ります。オフにすると従来の動作に戻ります。"});
 Object.assign(I18N["ko"],{"smartInk": "자동: 필기 / 도형", "smartInkHint": "펜을 떼면 명확한 직선, 호, 도형을 자동으로 정리합니다. 손글씨는 그대로 유지됩니다. 끄면 이전 모드로 돌아갑니다."});
 const DEC_COMMA=new Set(["de","uk","ru","pl","tr","es","fr","it","pt","nl"]);
+
+/* v18: localized notebook brand and improved gesture hints */
+Object.assign(I18N["en"], {"appName": "Doodles", "smartInk": "Auto: handwriting / drawing · scratch to erase", "smartInkHint": "One stroke becomes a straight line; fast back-and-forth scratches erase handwriting underneath. Unclear strokes stay as written. Uncheck to disable.", "gestureErased": "Area erased"});
+Object.assign(I18N["de"], {"appName": "Kritzelei", "smartInk": "Auto: Schreiben / Zeichnen · durchstreichen zum Löschen", "smartInkHint": "Ein einzelner Strich wird zur geraden Linie. Schnelles dichtes Hin-und-her-Kritzeln löscht darunterliegende Striche. Deaktivieren für den normalen Modus.", "gestureErased": "Bereich gelöscht"});
+Object.assign(I18N["uk"], {"appName": "Каракулі", "smartInk": "Авто: письмо / креслення · закреслення стирає", "smartInkHint": "Один штрих вирівнюється у пряму. Швидке щільне закреслення стирає штрихи під ним. Неоднозначний почерк не змінюється. Зніміть позначку для звичайного режиму.", "gestureErased": "Ділянку стерто"});
+Object.assign(I18N["ru"], {"appName": "Каракули", "smartInk": "Авто: письмо / черчение · зачёркивание стирает", "smartInkHint": "Один штрих выпрямляется в линию. Быстрое плотное зачёркивание стирает записи под ним. Неоднозначные штрихи остаются рукописными. Снимите галочку для обычного режима.", "gestureErased": "Область стёрта"});
+Object.assign(I18N["pl"], {"appName": "Bazgroły", "smartInk": "Auto: pismo / rysowanie · skreślenie wymazuje", "smartInkHint": "Jedno pociągnięcie zmienia się w prostą linię. Szybkie, gęste bazgranie usuwa znajdujące się pod nim kreski. Wyłącz, aby wrócić do zwykłego trybu.", "gestureErased": "Obszar wymazany"});
+Object.assign(I18N["tr"], {"appName": "Karalamalar", "smartInk": "Otomatik: yazı / çizim · karalayarak sil", "smartInkHint": "Tek çizgi düzeltilir. Hızlı, yoğun ileri geri karalama alttaki çizimleri siler. Belirsiz el yazısı korunur. Kapatınca normal mod devam eder.", "gestureErased": "Alan silindi"});
+Object.assign(I18N["es"], {"appName": "Garabatos", "smartInk": "Auto: escritura / dibujo · tachar para borrar", "smartInkHint": "Un solo trazo se endereza. Los tachones rápidos y densos borran los trazos debajo. Las marcas ambiguas se conservan. Desactiva para volver al modo habitual.", "gestureErased": "Área borrada"});
+Object.assign(I18N["fr"], {"appName": "Gribouillis", "smartInk": "Auto : écriture / dessin · gribouiller pour effacer", "smartInkHint": "Un trait se redresse. Des zigzags rapides et serrés effacent les traits dessous. Les traces ambiguës restent intactes. Décochez pour le mode normal.", "gestureErased": "Zone effacée"});
+Object.assign(I18N["it"], {"appName": "Scarabocchi", "smartInk": "Auto: scrittura / disegno · scarabocchia per cancellare", "smartInkHint": "Un tratto diventa una linea dritta. Zigzag rapidi e fitti cancellano i segni sottostanti. I tratti incerti restano inalterati. Disattiva per il modo normale.", "gestureErased": "Area cancellata"});
+Object.assign(I18N["pt"], {"appName": "Rabiscos", "smartInk": "Auto: escrita / desenho · rabiscar para apagar", "smartInkHint": "Um traço fica reto. Rabiscos rápidos e repetidos apagam os traços por baixo. Marcas ambíguas permanecem à mão. Desative para voltar ao normal.", "gestureErased": "Área apagada"});
+Object.assign(I18N["nl"], {"appName": "Krabbels", "smartInk": "Auto: schrijven / tekenen · krassen om te wissen", "smartInkHint": "Eén streek wordt een rechte lijn. Snelle dichte krassen wissen onderliggende inkt. Onduidelijke streken blijven handschrift. Schakel uit voor normaal.", "gestureErased": "Gebied gewist"});
+Object.assign(I18N["ar"], {"appName": "شخبطة", "smartInk": "تلقائي: كتابة / رسم · شخبطة للمسح", "smartInkHint": "الخط الواحد يصبح مستقيماً. الشخبطة السريعة المتكررة تمسح الخطوط التي تحتها. تبقى العلامات غير الواضحة كما هي. ألغِ التفعيل للوضع العادي.", "gestureErased": "تم مسح المنطقة"});
+Object.assign(I18N["zh"], {"appName": "涂鸦", "smartInk": "自动：手写 / 绘图 · 涂划擦除", "smartInkHint": "单笔画自动拉直。快速密集的往返涂划会擦除下面的笔迹。模糊的笔迹保留原样。取消勾选即可恢复普通模式。", "gestureErased": "已擦除区域"});
+Object.assign(I18N["ja"], {"appName": "落書き", "smartInk": "自動：手書き / 製図 · 素早く塗りつぶして消去", "smartInkHint": "1本の線を自動で直線にします。すばやい往復の塗りつぶしで下の線を消去します。不明確な手書きはそのまま。オフで従来の動作に戻ります。", "gestureErased": "範囲を消去しました"});
+Object.assign(I18N["ko"], {"appName": "낙서", "smartInk": "자동: 필기 / 도형 · 빠르게 덧칠해 지우기", "smartInkHint": "한 번 그은 선은 곧게 펴집니다. 빠르고 조밀한 왕복 낙서로 아래 획을 지웁니다. 애매한 손글씨는 유지됩니다. 끄면 일반 모드로 돌아갑니다.", "gestureErased": "영역을 지웠습니다"});
 let LANG="en"; try{ const l=localStorage.getItem("kritzelei.lang"); if(l&&I18N[l]) LANG=l; }catch(e){}
 function tt(k){ const d=I18N[LANG]; return (d&&d[k]!=null)?d[k]:(I18N.en[k]!=null?I18N.en[k]:k); }
 function tf(k,...a){ return tt(k).replace(/\{(\d)\}/g,(m,i)=>a[+i]); }
 function applyI18n(){
   document.documentElement.lang=LANG; document.documentElement.dir=LANG==="ar"?"rtl":"ltr";
+  document.title=tt("appName");
+  const appMeta=document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  if(appMeta) appMeta.content=tt("appName");
+  const man=document.querySelector('link[rel="manifest"]');
+  if(man) man.href="manifest-"+LANG+".webmanifest";
+  const brand=$("brandName"); if(brand) brand.textContent=tt("appName");
+  for(const id of ["appVer","appVer2"]){ const el=$(id); if(el) el.textContent=tt("appName")+" "+APP_VER; }
   for(const el of document.querySelectorAll("[data-i18n]")) el.textContent=tt(el.dataset.i18n);
   for(const a of ["title","aria-label","placeholder"]) for(const el of document.querySelectorAll("[data-i18n-"+a+"]")) el.setAttribute(a,tt(el.getAttribute("data-i18n-"+a)));
   for(const id of ["langSel","langSel2"]){ const sel=$(id); if(sel) sel.value=LANG; }
 }
-function setLang(l){ if(!I18N[l]||l===LANG) return; LANG=l; try{ localStorage.setItem("kritzelei.lang",l); }catch(e){} if(store&&store.setSetting) store.setSetting("lang",l).catch(()=>{}); refreshLang(); }
+function setLang(l){ if(!I18N[l]||l===LANG) return; cancelCalligPending(); LANG=l; try{ localStorage.setItem("kritzelei.lang",l); }catch(e){} if(store&&store.setSetting) store.setSetting("lang",l).catch(()=>{}); refreshLang(); }
 function refreshLang(){
   applyI18n(); segButtons($("newPaper"),PAPERS_L(),newPaper,k=>newPaper=k); renderNewLayout(); renderWhere(); renderLib();
   if(S.nb){ renderPaperSeg(); buildPages(); renderTools(); }
@@ -755,9 +799,12 @@ function drawQDim(ctx,it){
 const tctx=document.createElement("canvas").getContext("2d");
 let fontEpoch=0;
 const TFONT=(fs)=>fs+"px Rubik, system-ui, -apple-system, sans-serif";
+const CALLIG_FAMILIES={ar:'"Aref Ruqaa Ink", "Geeza Pro", serif',zh:'"Ma Shan Zheng", "Kaiti SC", serif',ja:'"Yuji Syuku", "Hiragino Mincho ProN", serif',ko:'"Nanum Pen Script", "Apple SD Gothic Neo", serif'};
+const calligFont=(fs,lang)=>`${fs}px ${CALLIG_FAMILIES[lang]||'"Caveat", "Noteworthy", cursive'}`;
+const fontForItem=(it)=>it.fam==="callig"?calligFont(it.fs,it.lang||"en"):TFONT(it.fs);
 function textLines(it){
-  const key=it.text+"|"+it.fs+"|"+it.tw+"|"+fontEpoch; if(it._lk===key) return it._lines;
-  tctx.font=TFONT(it.fs); const out=[];
+  const key=it.text+"|"+it.fs+"|"+it.tw+"|"+(it.fam||"")+"|"+(it.lang||"")+"|"+fontEpoch; if(it._lk===key) return it._lines;
+  tctx.font=fontForItem(it); const out=[];
   for(const para of String(it.text||"").split("\n")){
     let line="";
     const parts=[]; for(const w of para.split(/(\s+)/)){ if(!w) continue; if(/\s/.test(w)) parts.push(w); else if(/[\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/.test(w)||tctx.measureText(w).width>it.tw) parts.push(...w); else parts.push(w); }
@@ -766,7 +813,7 @@ function textLines(it){
   }
   it._lk=key; it._lines=out; return out;
 }
-function drawText(ctx,it){ const lines=textLines(it), lh=it.fs*1.3; ctx.save(); ctx.fillStyle=it.c; ctx.font=TFONT(it.fs); ctx.textBaseline="middle"; lines.forEach((ln,i)=>ctx.fillText(ln,it.x,it.y+i*lh+lh/2)); ctx.restore(); }
+function drawText(ctx,it){ const lines=textLines(it), lh=it.fs*1.3; ctx.save(); ctx.fillStyle=it.c; ctx.font=fontForItem(it); ctx.textBaseline="middle"; lines.forEach((ln,i)=>ctx.fillText(ln,it.x,it.y+i*lh+lh/2)); ctx.restore(); }
 function drawImg(ctx,it){ const r=imgRec(it.ref); if(r.ok) ctx.drawImage(r.img,it.x,it.y,it.iw,it.ih); else { ctx.save(); ctx.fillStyle="#eef1f6"; ctx.fillRect(it.x,it.y,it.iw,it.ih); ctx.strokeStyle="#c3cad6"; ctx.lineWidth=2; ctx.strokeRect(it.x,it.y,it.iw,it.ih); ctx.restore(); } }
 function drawItem(ctx,it){
   switch(it.t){
@@ -902,8 +949,24 @@ function memStore(){
 
 /* ================= state ================= */
 let store=null, books=[];
-const S={calcPos:null,calcDeg:true,pick:null,snap:true,scanMode:"color",nb:null,pages:[],tool:"pen",penColor:PEN_COLORS[0],hlColor:HL_COLORS[0],penW:1,hlW:1,finger:false,penType:"pen",autoShape:true,smartInk:false,custom:[],erMode:"whole",erSize:1,txtSize:1,shape:"circle",zoom:1,folder:"",query:"",undo:[],redo:[],lnLen:null,lnAng:null,fix:{dia:null,bw:null,bh:null},sel:null,clip:null,arc:null,baseW:880};
-const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
+/* v19: selected-language text recognition and optional calligraphic replacement */
+Object.assign(I18N["en"],{"calligInk": "Beautiful handwriting · recognize text", "calligHint": "Recognize strokes in the selected language and replace confidently read words with calligraphy. First use of each language requires internet to download an OCR model; handwriting stays on this device. Uncertain writing is left untouched.", "calligSelection": "Beautify selected handwriting", "calligReview": "Review recognized text", "calligKeep": "Keep handwriting", "calligApply": "Replace with calligraphy", "calligWorking": "Recognizing handwriting…", "calligLoadError": "Could not load recognition. Connect to the internet and retry.", "calligNeedSelection": "Select handwritten strokes with Lasso first.", "calligRecognized": "Recognized text", "calligUncertain": "No reliable text detected. Original ink kept."});
+Object.assign(I18N["de"],{"calligInk": "Schönschrift · Texterkennung", "calligHint": "Erkennt Handschrift in der gewählten Sprache. Sprachmodelle werden beim ersten Mal aus dem Internet geladen, die Erkennung erfolgt auf diesem Gerät. Unklare Schrift bleibt erhalten.", "calligSelection": "Auswahl in Schönschrift", "calligReview": "Erkannten Text prüfen", "calligKeep": "Handschrift behalten", "calligApply": "Als Schönschrift ersetzen", "calligWorking": "Handschrift wird erkannt…", "calligLoadError": "Sprachmodell konnte nicht geladen werden. Bitte Internet prüfen.", "calligNeedSelection": "Zuerst Handschrift mit dem Lasso auswählen.", "calligRecognized": "Erkannter Text", "calligUncertain": "Keine sichere Erkennung. Original bleibt erhalten."});
+Object.assign(I18N["ru"],{"calligInk": "Каллиграфия · распознавание текста", "calligHint": "Распознаёт рукописные слова на выбранном языке. При первом использовании языка нужен интернет для загрузки модели. Сам текст не отправляется на сервер. Неуверенные результаты не заменяются автоматически.", "calligSelection": "Улучшить выделенный почерк", "calligReview": "Проверить распознанный текст", "calligKeep": "Оставить рукопись", "calligApply": "Заменить красивым почерком", "calligWorking": "Распознаю рукописный текст…", "calligLoadError": "Модель распознавания не загрузилась. Проверь интернет.", "calligNeedSelection": "Сначала выдели рукописный текст лассо.", "calligRecognized": "Распознанный текст", "calligUncertain": "Надёжно распознать не удалось, почерк оставлен."});
+Object.assign(I18N["uk"],{"calligInk": "Каліграфія · розпізнавання тексту", "calligHint": "Розпізнає рукописний текст вибраною мовою. Для першого завантаження мовної моделі потрібен інтернет, розпізнавання виконується на пристрої. Сумнівні результати зберігають почерк.", "calligSelection": "Покращити виділений почерк", "calligReview": "Перевірити розпізнаний текст", "calligKeep": "Залишити рукопис", "calligApply": "Замінити каліграфією", "calligWorking": "Розпізнавання рукопису…", "calligLoadError": "Не вдалося завантажити модель. Перевір інтернет.", "calligNeedSelection": "Спочатку виділи рукопис за допомогою ласо.", "calligRecognized": "Розпізнаний текст", "calligUncertain": "Ненадійне розпізнавання, рукопис збережено."});
+Object.assign(I18N["pl"],{"calligInk": "Kaligrafia · rozpoznawanie pisma", "calligHint": "Rozpoznaje pismo w wybranym języku. Pierwsze użycie wymaga internetu do pobrania modelu; dane pisma pozostają na urządzeniu. Niepewne wyniki nie są zmieniane.", "calligSelection": "Popraw zaznaczone pismo", "calligReview": "Sprawdź rozpoznany tekst", "calligKeep": "Zachowaj pismo", "calligApply": "Zamień na kaligrafię", "calligWorking": "Rozpoznawanie pisma…", "calligLoadError": "Nie można pobrać modelu. Sprawdź internet.", "calligNeedSelection": "Najpierw zaznacz pismo lassem.", "calligRecognized": "Rozpoznany tekst", "calligUncertain": "Brak pewnego odczytu. Pismo zachowane."});
+Object.assign(I18N["fr"],{"calligInk": "Calligraphie · reconnaissance", "calligHint": "Reconnaît l’écriture dans la langue choisie. Le premier usage nécessite internet pour télécharger un modèle; la reconnaissance reste sur l’appareil.", "calligSelection": "Embellir la sélection", "calligReview": "Vérifier le texte reconnu", "calligKeep": "Garder l’écriture", "calligApply": "Remplacer par calligraphie", "calligWorking": "Reconnaissance en cours…", "calligLoadError": "Modèle indisponible. Vérifiez internet.", "calligNeedSelection": "Sélectionnez les traits avec le lasso.", "calligRecognized": "Texte reconnu", "calligUncertain": "Reconnaissance incertaine : encre conservée."});
+Object.assign(I18N["es"],{"calligInk": "Caligrafía · reconocimiento", "calligHint": "Reconoce la escritura en el idioma elegido. La primera vez necesita internet para descargar el modelo; el análisis ocurre en el dispositivo.", "calligSelection": "Mejorar la selección", "calligReview": "Revisar texto reconocido", "calligKeep": "Conservar original", "calligApply": "Sustituir por caligrafía", "calligWorking": "Reconociendo escritura…", "calligLoadError": "No se pudo cargar el modelo. Comprueba internet.", "calligNeedSelection": "Selecciona primero con el lazo.", "calligRecognized": "Texto reconocido", "calligUncertain": "Sin reconocimiento seguro. Se mantiene el original."});
+Object.assign(I18N["it"],{"calligInk": "Calligrafia · riconoscimento", "calligHint": "Riconosce la scrittura nella lingua scelta. La prima volta serve internet per scaricare il modello; i dati restano sul dispositivo.", "calligSelection": "Migliora la selezione", "calligReview": "Controlla testo riconosciuto", "calligKeep": "Mantieni la scrittura", "calligApply": "Sostituisci con calligrafia", "calligWorking": "Riconoscimento in corso…", "calligLoadError": "Impossibile caricare il modello. Controlla internet.", "calligNeedSelection": "Seleziona prima con il lazo.", "calligRecognized": "Testo riconosciuto", "calligUncertain": "Risultato incerto. Scrittura conservata."});
+Object.assign(I18N["pt"],{"calligInk": "Caligrafia · reconhecimento", "calligHint": "Reconhece texto manuscrito no idioma selecionado. É preciso internet para baixar o modelo uma vez; o reconhecimento é feito no dispositivo.", "calligSelection": "Melhorar seleção", "calligReview": "Rever texto reconhecido", "calligKeep": "Manter manuscrito", "calligApply": "Substituir por caligrafia", "calligWorking": "Reconhecendo escrita…", "calligLoadError": "Não foi possível carregar o modelo. Verifique a internet.", "calligNeedSelection": "Selecione os traços com o laço.", "calligRecognized": "Texto reconhecido", "calligUncertain": "Não foi reconhecido com confiança. Original preservado."});
+Object.assign(I18N["nl"],{"calligInk": "Schoonschrift · herkenning", "calligHint": "Herkent handschrift in de gekozen taal. Voor de eerste keer is internet nodig om het taalmodel te downloaden; de verwerking gebeurt lokaal.", "calligSelection": "Selectie verfraaien", "calligReview": "Herkende tekst controleren", "calligKeep": "Handschrift behouden", "calligApply": "Als schoonschrift vervangen", "calligWorking": "Handschrift herkennen…", "calligLoadError": "Taalmodel laden mislukt. Controleer internet.", "calligNeedSelection": "Selecteer eerst met de lasso.", "calligRecognized": "Herkende tekst", "calligUncertain": "Niet betrouwbaar herkend. Origineel behouden."});
+Object.assign(I18N["ar"],{"calligInk": "خط جميل · التعرف على الكتابة", "calligHint": "يتعرف على الكتابة باللغة المختارة. يلزم الإنترنت أول مرة لتنزيل نموذج اللغة؛ تُعالج الكتابة على جهازك فقط.", "calligSelection": "تحسين الخط المحدد", "calligReview": "مراجعة النص", "calligKeep": "الإبقاء على الكتابة", "calligApply": "استبدال بخط جميل", "calligWorking": "جارٍ التعرف على الكتابة…", "calligLoadError": "تعذر تحميل النموذج. تحقق من الإنترنت.", "calligNeedSelection": "حدد الكتابة أولا بأداة التحديد.", "calligRecognized": "النص المتعرف عليه", "calligUncertain": "النتيجة غير مؤكدة. تم الحفاظ على الخط."});
+Object.assign(I18N["zh"],{"calligInk": "书法美化 · 手写识别", "calligHint": "根据所选语言识别手写文字。首次使用需要联网下载语言模型；识别在设备上进行。结果不确定时保留原稿。", "calligSelection": "美化选中笔迹", "calligReview": "核对识别文字", "calligKeep": "保留原笔迹", "calligApply": "替换成书法字体", "calligWorking": "正在识别手写文字…", "calligLoadError": "无法加载模型，请检查网络。", "calligNeedSelection": "请先用套索选择笔迹。", "calligRecognized": "识别文字", "calligUncertain": "识别不确定，保留原稿。"});
+Object.assign(I18N["ja"],{"calligInk": "美文字 · 手書き認識", "calligHint": "選択した言語で手書きを認識します。初回は言語モデルのダウンロードに通信が必要です。認識処理は端末内で行います。", "calligSelection": "選択した文字を美文字に", "calligReview": "認識結果を確認", "calligKeep": "手書きを残す", "calligApply": "美文字に置換", "calligWorking": "手書き認識中…", "calligLoadError": "モデルを読み込めません。通信を確認してください。", "calligNeedSelection": "先に投げ縄で文字を選択してください。", "calligRecognized": "認識された文字", "calligUncertain": "認識が不確実なため元の筆跡を残しました。"});
+Object.assign(I18N["ko"],{"calligInk": "손글씨 보정 · 글자 인식", "calligHint": "선택한 언어의 손글씨를 인식합니다. 처음에는 언어 모델을 다운로드할 인터넷이 필요합니다. 인식은 기기에서 수행됩니다.", "calligSelection": "선택한 손글씨 꾸미기", "calligReview": "인식 결과 확인", "calligKeep": "원본 유지", "calligApply": "예쁜 글씨로 교체", "calligWorking": "손글씨 인식 중…", "calligLoadError": "모델을 불러오지 못했습니다. 인터넷을 확인하세요.", "calligNeedSelection": "먼저 올가미로 글씨를 선택하세요.", "calligRecognized": "인식된 글자", "calligUncertain": "인식이 불확실하여 원본을 유지했습니다."});
+Object.assign(I18N["tr"],{"calligInk": "Güzel yazı · el yazısı tanıma", "calligHint": "Seçilen dilde el yazısını tanır. İlk kullanımda dil modelini indirmek için internet gerekir; işleme cihazda yapılır.", "calligSelection": "Seçilen yazıyı güzelleştir", "calligReview": "Tanınan metni kontrol et", "calligKeep": "Yazıyı koru", "calligApply": "Kaligrafiyle değiştir", "calligWorking": "El yazısı tanınıyor…", "calligLoadError": "Model yüklenemedi. İnterneti kontrol edin.", "calligNeedSelection": "Önce kementle el yazısını seçin.", "calligRecognized": "Tanınan metin", "calligUncertain": "Güvenilir tanıma yok. Asıl yazı korundu."});
+const S={calcPos:null,calcDeg:true,pick:null,snap:true,scanMode:"color",nb:null,pages:[],tool:"pen",penColor:PEN_COLORS[0],hlColor:HL_COLORS[0],penW:1,hlW:1,finger:false,penType:"pen",autoShape:true,smartInk:false,calligInk:false,custom:[],erMode:"whole",erSize:1,txtSize:1,shape:"circle",zoom:1,folder:"",query:"",undo:[],redo:[],lnLen:null,lnAng:null,fix:{dia:null,bw:null,bh:null},sel:null,clip:null,arc:null,baseW:880};
+const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","calligInk","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
 try{ const pref=JSON.parse(localStorage.getItem("kritzelei.prefs")||"{}"); for(const k of PREF_KEYS) if(pref[k]!==undefined) S[k]=pref[k]; }catch(e){}
 function savePrefs(){ try{ const o={}; for(const k of PREF_KEYS) o[k]=S[k]; localStorage.setItem("kritzelei.prefs",JSON.stringify(o)); }catch(e){} }
 const dirty=new Set(); let metaDirty=false, saveT=null, saving=false, saveAgain=false;
@@ -1323,12 +1386,22 @@ function renderOptsInner(o){
   }
   if(t==="shape"&&S.shape!=="arc"&&S.shape!=="adim") o.append(snapToggle());
   if(t==="er"){ o.append(seg([["whole",tt("whole")],["part",tt("partial")]],S.erMode,v=>{ S.erMode=v; savePrefs(); },tt("erMode"))); o.append(seg([["0","S"],["1","M"],["2","L"]],String(S.erSize),v=>{ S.erSize=+v; savePrefs(); },tt("erSize"))); }
-  if(t==="lasso"){ o.append(h("button",{class:"btn sm",type:"button",onclick:()=>selectAllOnPage()},tt("selectPage"))); const pb=h("button",{class:"btn sm",type:"button",onclick:()=>pasteClip()},tt("paste")); pb.disabled=!S.clip; o.append(pb); }
+  if(t==="lasso"){
+    o.append(h("button",{class:"btn sm",type:"button",onclick:()=>selectAllOnPage()},tt("selectPage")));
+    const pb=h("button",{class:"btn sm",type:"button",onclick:()=>pasteClip()},tt("paste")); pb.disabled=!S.clip; o.append(pb);
+    const cb=h("button",{class:"btn sm",type:"button",onclick:()=>calligSelected()},tt("calligSelection"));
+    o.append(cb);
+  }
   if(t==="pen"){
     const smart=h("input",{type:"checkbox",id:"smartInk", "aria-label":tt("smartInk")});
     smart.checked=!!S.smartInk;
     smart.onchange=()=>{ S.smartInk=smart.checked; savePrefs(); renderOpts(); };
     o.append(h("label",{class:"tog smart-mode",title:tt("smartInkHint")},smart,tt("smartInk")));
+    const cc=h("input",{type:"checkbox",id:"calligInk","aria-label":tt("calligInk")});
+    cc.checked=!!S.calligInk;
+    cc.onchange=()=>{ S.calligInk=cc.checked; if(!cc.checked) cancelCalligPending(); savePrefs(); renderOpts(); };
+    o.append(h("label",{class:"tog smart-mode",title:tt("calligHint")},cc,tt("calligInk")));
+    if(S.calligInk) o.append(h("span",{class:"hint"},tt("calligHint")));
     // Existing hold-to-straighten option remains unchanged when smart mode is off.
     if(!S.smartInk){ const cb=h("input",{type:"checkbox",id:"autoShape"}); cb.checked=!!S.autoShape; cb.onchange=()=>{ S.autoShape=cb.checked; savePrefs(); renderOpts(); }; o.append(h("label",{class:"tog"},cb,tt("straighten"))); }
   }
@@ -1590,9 +1663,9 @@ function dp(pts,eps){
 function polyErr(pts,verts,closed){ let s=0; const n=verts.length; for(const q of pts){ let md=1e9; for(let i=0;i<(closed?n:n-1);i++){ const u=verts[i], v=verts[(i+1)%n]; md=Math.min(md,segDist(q[0],q[1],u[0],u[1],v[0],v[1])); } s+=md; } return s/pts.length; }
 function circle3(a,b,c){ const d=2*(a[0]*(b[1]-c[1])+b[0]*(c[1]-a[1])+c[0]*(a[1]-b[1])); if(Math.abs(d)<1e-6) return null; const a2=a[0]*a[0]+a[1]*a[1], b2=b[0]*b[0]+b[1]*b[1], c2=c[0]*c[0]+c[1]*c[1]; const cx=(a2*(b[1]-c[1])+b2*(c[1]-a[1])+c2*(a[1]-b[1]))/d, cy=(a2*(c[0]-b[0])+b2*(a[0]-c[0])+c2*(b[0]-a[0]))/d; return {cx,cy,r:Math.hypot(a[0]-cx,a[1]-cy)}; }
 function recognize(stroke,pg){
-  const p=stroke.p; if(p.length<24) return null;
+  const p=stroke.p; if(p.length<9) return null;
   const raw=[]; for(let i=0;i<p.length;i+=3) raw.push([p[i],p[i+1]]);
-  const rs=resample(raw,72); if(!rs||rs.tot<30) return null; const pts=rs.out, tot=rs.tot;
+  const rs=resample(raw,72); if(!rs||rs.tot<22) return null; const pts=rs.out, tot=rs.tot;
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const [x,y] of pts){ x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); }
   const D=Math.hypot(x1-x0,y1-y0)||1, A=pts[0], B=pts[pts.length-1], se=Math.hypot(B[0]-A[0],B[1]-A[1]);
   const mk=(o)=>Object.assign(o,{c:stroke.c,w:stroke.w});
@@ -1637,75 +1710,268 @@ function recognize(stroke,pg){
   return null;
 }
 
-/* ================= smart ink: handwriting or technical geometry =================
-   Conservative and opt-in. Each completed pen stroke is assessed; uncertain/small
-   marks remain untouched as handwriting. No cloud, OCR, or learning from private data.
-   The legacy 520ms hold-to-shape path is preserved when the checkbox is off. */
-let lastSmartInk=null;
-function smartInkEnd(a){
-  const s=a.stroke, raw=s&&s.p, pg=a.pg;
-  if(!raw||raw.length<15) return s;
-  const pts=[];
-  for(let i=0;i<raw.length;i+=3) pts.push([raw[i],raw[i+1]]);
-  const bb=bbox(s), width=bb[2]-bb[0],height=bb[3]-bb[1];
-  const diag=Math.hypot(width,height), rs=resample(pts,64);
-  const now=performance.now();
-  const prev=lastSmartInk;
-  const remember=(item,ink)=>{ lastSmartInk={pid:pg.id,when:now,ink,end:pts[pts.length-1],bb}; return item; };
-  if(!rs||rs.tot<45||diag<52) return remember(s,true);
-  const A=rs.out[0], B=rs.out[rs.out.length-1];
-  const chord=Math.hypot(B[0]-A[0],B[1]-A[1]);
-  const joinedWriting=!!(prev&&prev.pid===pg.id&&prev.ink&&now-prev.when<1650&&
-    Math.hypot(A[0]-prev.end[0],A[1]-prev.end[1])<55&&
-    prev.bb[3]-prev.bb[1]<95&&diag<145);
-  if(joinedWriting) return remember(s,true);
-  // Very straight gestures of writing-sized lengths (l, t, I etc) remain ink.
-  if(chord>=83&&rs.tot/chord<1.075){
-    let maxErr=0,avg=0;
-    for(const q of rs.out){ const d=segDist(q[0],q[1],A[0],A[1],B[0],B[1]);
-      if(d>maxErr) maxErr=d; avg+=d; }
-    avg/=rs.out.length;
-    if(maxErr<=Math.max(3.5,chord*.034)&&avg<=Math.max(2,chord*.013)){
-      // Reuse exact endpoint/snap logic and the existing editable line format.
-      let angle=Math.atan2(B[1]-A[1],B[0]-A[0]);
-      const snapAngle=Math.round(angle/(Math.PI/4))*(Math.PI/4);
-      if(Math.abs(angle-snapAngle)<4*Math.PI/180) angle=snapAngle;
-      const p=[A[0],A[1],.5,A[0]+Math.cos(angle)*chord,A[1]+Math.sin(angle)*chord,.5];
-      alignToPaper(p,pg);
-      return remember({t:"p",c:s.c,w:s.w,p},false);
-    }
+/* ================= v19 optional multilingual handwriting to calligraphy =================
+   Tesseract.js runs in this browser; language data/engine downloads are needed the
+   first time. No handwriting image is uploaded to an OCR server. Recognition is
+   conservative: only a high-confidence multi-stroke group is auto-replaced.
+   Manual selection always requires approval and supports editing an OCR guess. */
+const OCR_LANG={en:"eng",de:"deu",uk:"ukr",ru:"rus",pl:"pol",tr:"tur",es:"spa",fr:"fra",it:"ita",pt:"por",nl:"nld",ar:"ara",zh:"chi_sim",ja:"jpn",ko:"kor"};
+const OCR_LIB="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+let calligPending=null,calligTimer=0,calligJob=Promise.resolve(),ocrWorker=null,ocrWorkerLang=null,ocrScriptP=null,ocrBusy=false;
+function cancelCalligPending(){ clearTimeout(calligTimer); calligTimer=0; calligPending=null; }
+function strokeInkBounds(items){ let bb=[Infinity,Infinity,-Infinity,-Infinity]; for(const it of items){const z=bbox(it);bb=[Math.min(bb[0],z[0]),Math.min(bb[1],z[1]),Math.max(bb[2],z[2]),Math.max(bb[3],z[3])];} return bb; }
+async function loadOCR(lang){
+  if(!window.Tesseract){ if(!ocrScriptP) ocrScriptP=loadScript(OCR_LIB).catch(e=>{ocrScriptP=null;throw e;}); await ocrScriptP; }
+  if(ocrWorker&&ocrWorkerLang===lang) return ocrWorker;
+  if(ocrWorker){try{await ocrWorker.terminate();}catch(e){} ocrWorker=null;ocrWorkerLang=null;}
+  const code=OCR_LANG[lang]||"eng";
+  ocrWorker=await window.Tesseract.createWorker(code,1,{cacheMethod:"write",logger:()=>{}});
+  ocrWorkerLang=lang;
+  if(ocrWorker.setParameters) await ocrWorker.setParameters({tessedit_pageseg_mode:"7",preserve_interword_spaces:"1"});
+  return ocrWorker;
+}
+function makeCalligImage(items){
+  const bb=strokeInkBounds(items),width=Math.max(2,bb[2]-bb[0]),height=Math.max(2,bb[3]-bb[1]),pad=20;
+  const scale=Math.min(4,1800/Math.max(width,height)),c=document.createElement("canvas");
+  c.width=Math.max(96,Math.ceil((width+2*pad)*scale));c.height=Math.max(80,Math.ceil((height+2*pad)*scale));
+  const ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
+  ctx.setTransform(scale,0,0,scale,(pad-bb[0])*scale,(pad-bb[1])*scale);
+  for(const it of items) if(isFree(it)){let ink=cloneItem(it);ink.c="#080808";ink.w=Math.max(3.1,it.w||3);drawStroke(ctx,ink);}
+  return {image:c,bb};
+}
+function recognizedLanguageMatches(str,lang){
+  if(!str||!str.trim())return false;
+  const allowed={ru:/[А-Яа-яЁё]/,uk:/[А-Яа-яІіЇїЄєҐґ]/,ar:/[\u0600-\u06FF]/,zh:/[\u3400-\u9FFF]/,ja:/[\u3040-\u30FF\u3400-\u9FFF]/,ko:/[\uAC00-\uD7AF]/};
+  return allowed[lang]?allowed[lang].test(str):/[A-Za-zÀ-žİıĞğŞş]/.test(str);
+}
+function normalizeOcrText(raw){return String(raw||"").replace(/[\r\n]+/g," ").replace(/\s+/g," ").trim().slice(0,250);}
+function makeCalligText(items,str,lang){
+  const bb=strokeInkBounds(items);const x=clamp(bb[0],4,W-40),y=Math.max(4,bb[1]-3),maxwidth=Math.max(60,W-x-14);
+  let fs=clamp((bb[3]-bb[1])*1.05,22,82);
+  tctx.font=calligFont(fs,lang);
+  let tw=tctx.measureText(str).width;
+  if(tw>maxwidth-8){fs=clamp(fs*(maxwidth-8)/Math.max(1,tw),16,fs);tctx.font=calligFont(fs,lang);tw=tctx.measureText(str).width;}
+  return {t:"x",x,y,tw:Math.max(45,Math.min(maxwidth,tw+17)),fs,c:items[0].c||S.penColor,text:str,lang,fam:"callig"};
+}
+async function loadCalligFont(lang,fs){try{if(document.fonts&&document.fonts.load){await document.fonts.load(calligFont(fs,lang));fontEpoch++;}}catch(e){}}
+function replaceCallig(pg,items,str,lang){
+  if(!pg||!str||!items.length||!items.every(it=>pg.strokes.includes(it)))return false;
+  const before=pg.strokes.slice(),idx=before.indexOf(items[0]),set=new Set(items),txt=makeCalligText(items,str,lang);
+  pg.strokes=before.filter(it=>!set.has(it));pg.strokes.splice(Math.min(idx,pg.strokes.length),0,txt);
+  redraw(pg);commitPage(pg,before);clearSel();loadCalligFont(lang,txt.fs).then(()=>redraw(pg));return true;
+}
+function showCalligReview(pg,items,str,lang,confidence){
+  if(!items.every(it=>pg.strokes.includes(it)))return;
+  const box=$("calligReview"),input=$("calligReviewText");
+  $("calligReviewTitle").textContent=tt("calligReview");
+  $("calligReviewInfo").textContent=tt("calligRecognized")+" · "+lang.toUpperCase()+" · "+Math.round(confidence)+"%";
+  $("calligKeep").textContent=tt("calligKeep");$("calligApply").textContent=tt("calligApply");
+  input.value=str;box.hidden=false;
+  const close=()=>{box.hidden=true;$("calligApply").onclick=null;$("calligKeep").onclick=null;};
+  $("calligKeep").onclick=close;
+  $("calligApply").onclick=()=>{const edited=input.value.trim();close();if(edited)replaceCallig(pg,items,edited,lang);};
+  requestAnimationFrame(()=>input.focus());
+}
+async function recognizeCallig(pg,items,lang,manual){
+  if(!items.length||!items.every(it=>pg.strokes.includes(it)))return;
+  ocrBusy=true;
+  if(manual)toast(tt("calligWorking"),0);
+  const waitNotice=manual?null:setTimeout(()=>{if(ocrBusy)toast(tt("calligWorking"),0);},1100);
+  try{
+    const img=makeCalligImage(items);
+    const worker=await loadOCR(lang);
+    const answer=await worker.recognize(img.image);
+    const data=answer&&answer.data||{},s=normalizeOcrText(data.text),conf=Number(data.confidence)||0;
+    if(!items.every(it=>pg.strokes.includes(it)))return;
+    if(manual){toast("");showCalligReview(pg,items,s,lang,conf);return;}
+    if(!S.calligInk||LANG!==lang||!s||!recognizedLanguageMatches(s,lang))return;
+    // A conservative threshold avoids replacing drawings or uncertain OCR results.
+    if(conf>=80&&s.replace(/\s+/g,"").length>=2){await loadCalligFont(lang,36);replaceCallig(pg,items,s,lang);}
+  }catch(e){console.warn("Calligraphy recognition unavailable:",e);if(manual)toast(tt("calligLoadError"),4500);}
+  finally{
+    ocrBusy=false;clearTimeout(waitNotice);
+    const msg=$("toast");if(msg&&msg.textContent===tt("calligWorking"))msg.classList.remove("on");
   }
-  // A circle, rectangle, triangle or polyline must be much bigger than a letter.
-  // Only accept the existing geometric recognizer's outputs at conservative scale.
-  if(diag<88||Math.max(width,height)<75) return remember(s,true);
+}
+function submitCallig(pg,items,lang,manual){
+  // Run requests sequentially: the OCR worker is language-specific.
+  calligJob=calligJob.catch(()=>{}).then(()=>recognizeCallig(pg,items,lang,manual));
+}
+function queueCallig(pg,it){
+  if(!S.calligInk||!pg||!isFree(it))return;
+  const now=performance.now();let g=calligPending;
+  const b=bbox(it);
+  if(g&&g.pg===pg&&g.lang===LANG&&now-g.when<3200){
+    const p=strokeInkBounds(g.items),dy=Math.max(0,b[1]-p[3],p[1]-b[3]),dx=Math.max(0,b[0]-p[2],p[0]-b[2]);
+    if(dy>Math.max(50,p[3]-p[1])||dx>130){const old=g;cancelCalligPending();if(old.items.length>=2)submitCallig(old.pg,old.items,old.lang,false);g=null;}
+  }else if(g){const old=g;cancelCalligPending();if(old.items.length>=2)submitCallig(old.pg,old.items,old.lang,false);g=null;}
+  if(!g)g={pg,lang:LANG,items:[],when:now};
+  g.items.push(it);g.when=now;calligPending=g;
+  clearTimeout(calligTimer);
+  calligTimer=setTimeout(()=>{if(calligPending!==g)return;calligPending=null;calligTimer=0;
+    if(g.items.length>=2){const z=strokeInkBounds(g.items);if(z[2]-z[0]>18&&z[3]-z[1]>12)submitCallig(g.pg,g.items,g.lang,false);}
+  },1450);
+}
+function calligSelected(){
+  if(!S.sel||!S.sel.items.length){toast(tt("calligNeedSelection"));return;}
+  const {pg,items}=S.sel,selected=items.filter(isFree);
+  if(!selected.length){toast(tt("calligNeedSelection"));return;}
+  cancelCalligPending();submitCallig(pg,selected.slice(),LANG,true);
+}
+$("calligReview").addEventListener("click",e=>{if(e.target===$("calligReview"))$("calligKeep").click();});
+
+/* ================= v18 smart ink: genuine single-stroke lines + scratch erase =================
+   This is local geometric recognition (not handwriting recognition). All conversions
+   are opt-in and apply only to pen mode. A scratch deletes only existing notebook
+   ink, not the underlying PDF image, and Undo restores the affected strokes. */
+let lastSmartInk=null;
+function inkPoints(stroke){
+  const p=stroke&&stroke.p||[], pts=[];
+  for(let i=0;i<p.length;i+=3){
+    const x=p[i],y=p[i+1];
+    if(!Number.isFinite(x)||!Number.isFinite(y)) continue;
+    if(!pts.length||Math.hypot(x-pts[pts.length-1][0],y-pts[pts.length-1][1])>.4) pts.push([x,y]);
+  }
+  return pts;
+}
+function straightStroke(stroke,points,pg){
+  if(points.length<2) return null;
+  const first=points[0],last=points[points.length-1], chord=Math.hypot(last[0]-first[0],last[1]-first[1]);
+  // 42 units is roughly 10 mm on a standard notebook sheet. Handwriting-sized
+  // ticks and dots remain ink; even a gesture with only two reported points works.
+  if(chord<42) return null;
+  let path=0, avg=0, worst=0;
+  for(let i=0;i<points.length;i++){
+    if(i) path+=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);
+    const deviation=segDist(points[i][0],points[i][1],first[0],first[1],last[0],last[1]);
+    avg+=deviation; worst=Math.max(worst,deviation);
+  }
+  avg/=points.length;
+  // Reject curly lettering and paths that retrace themselves.
+  if(path/chord>1.16||worst>Math.max(4.5,chord*.072)||avg>Math.max(2.5,chord*.033)) return null;
+  let angle=Math.atan2(last[1]-first[1],last[0]-first[0]);
+  const snapped=Math.round(angle/(Math.PI/4))*(Math.PI/4);
+  if(Math.abs(Math.atan2(Math.sin(angle-snapped),Math.cos(angle-snapped)))<3*Math.PI/180) angle=snapped;
+  const p=[first[0],first[1],.5,first[0]+Math.cos(angle)*chord,first[1]+Math.sin(angle)*chord,.5];
+  alignToPaper(p,pg);
+  return {t:"p",c:stroke.c,w:stroke.w,p};
+}
+function eraseGestureMetrics(points,elapsed){
+  if(points.length<5||elapsed>1900) return null;
+  const rs=resample(points,Math.min(96,Math.max(24,points.length*2)));
+  if(!rs||rs.tot<145||rs.tot/Math.max(elapsed,120)<.16) return null;
+  const p=rs.out;
+  let mx=0,my=0,minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  for(const [x,y] of p){ mx+=x;my+=y;minx=Math.min(minx,x);maxx=Math.max(maxx,x);miny=Math.min(miny,y);maxy=Math.max(maxy,y); }
+  mx/=p.length;my/=p.length;
+  const width=maxx-minx,height=maxy-miny, diag=Math.hypot(width,height);
+  if(diag<29||rs.tot/Math.max(diag,1)<2.7) return null;
+  let xx=0,xy=0,yy=0;
+  for(const [x,y] of p){ const dx=x-mx,dy=y-my;xx+=dx*dx;xy+=dx*dy;yy+=dy*dy; }
+  const theta=.5*Math.atan2(2*xy,xx-yy),cx=Math.cos(theta),cy=Math.sin(theta);
+  const projections=p.map(([x,y])=>(x-mx)*cx+(y-my)*cy);
+  const range=Math.max(...projections)-Math.min(...projections);
+  if(range<27) return null;
+  const needed=Math.max(12,range*.18);
+  let trend=0,run=0,swings=0;
+  for(let i=1;i<projections.length;i++){
+    const d=projections[i]-projections[i-1];
+    if(Math.abs(d)<.55) continue;
+    const sg=Math.sign(d);
+    if(!trend){trend=sg;run=Math.abs(d);}
+    else if(sg===trend) run+=Math.abs(d);
+    else if(run>=needed){swings++;trend=sg;run=Math.abs(d);}
+    else {trend=sg;run=Math.abs(d);}
+  }
+  // At least four deliberate passes: a normal tick, cross, arc, circle or
+  // two-stroke letter cannot be mistaken for a gesture erase.
+  if(swings<3) return null;
+  return {points:p,tot:rs.tot,bb:[minx,miny,maxx,maxy],swings};
+}
+function scratchErase(a,points){
+  const pg=a.pg;
+  if(!pg.strokes.length) return false;
+  const g=eraseGestureMetrics(points,performance.now()-(a.startedAt||performance.now()));
+  if(!g) return false;
+  // A scratch is an eraser only when it passes over pre-existing handwriting.
+  const radius=clamp(10+Math.min(9,(g.bb[3]-g.bb[1])/(g.swings+2)),12,22);
+  let hitExisting=false;
+  for(const p of g.points){
+    if(pg.strokes.some(it=>it.t!=="i"&&hitItem(it,p[0],p[1],radius))){hitExisting=true;break;}
+  }
+  if(!hitExisting) return false;
+  const before=pg.strokes.slice();
+  const modified=[];
+  // Erase a small continuous corridor around the entire back-and-forth gesture.
+  // It does not remove the whole long line if only a middle portion was crossed.
+  for(const old of before){
+    if(old.t==="i"){modified.push(old);continue;}
+    const bb=bbox(old);
+    if(bb[2]<g.bb[0]-radius||bb[0]>g.bb[2]+radius||bb[3]<g.bb[1]-radius||bb[1]>g.bb[3]+radius){modified.push(old);continue;}
+    let parts=[old];
+    for(const [x,y] of g.points){
+      const next=[];
+      for(const part of parts){
+        if(!hitItem(part,x,y,radius)){next.push(part);continue;}
+        if(part.t==="d"||part.t==="q"||part.t==="x") continue;
+        const pieces=splitErase(part,x,y,radius);
+        if(pieces===null) next.push(part);
+        else next.push(...pieces);
+      }
+      parts=next;
+      if(!parts.length) break;
+    }
+    modified.push(...parts);
+  }
+  if(modified.length===before.length&&modified.every((it,i)=>it===before[i])) return false;
+  pg.strokes=modified;
+  redraw(pg);
+  commitPage(pg,before);
+  lastSmartInk=null;
+  vibrate();toast(tt("gestureErased"),1200);
+  return true;
+}
+function smartInkEnd(a){
+  const s=a.stroke,pg=a.pg,points=inkPoints(s);
+  if(points.length<2) return s;
+  if(scratchErase(a,points)) return null; // action was committed, no new ink
+  const bb=bbox(s),width=bb[2]-bb[0],height=bb[3]-bb[1],diag=Math.hypot(width,height);
+  const now=performance.now(),prev=lastSmartInk;
+  const remember=(item,ink)=>{lastSmartInk={pid:pg.id,when:now,ink,end:points[points.length-1],bb};return item;};
+  // First try even a two-point line. The v17 83-unit / 15-coordinate gate
+  // incorrectly rejected normal Pencil strokes; this is deliberately earlier
+  // than every handwriting-join heuristic.
+  const line=straightStroke(s,points,pg);
+  if(line) return remember(line,false);
+  if(points.length<4||diag<54) return remember(s,true);
+  const joinedWriting=!!(prev&&prev.pid===pg.id&&prev.ink&&now-prev.when<650&&
+    Math.hypot(points[0][0]-prev.end[0],points[0][1]-prev.end[1])<22&&diag<85);
+  if(joinedWriting) return remember(s,true);
+  const rs=resample(points,64);
+  if(!rs||rs.tot<75) return remember(s,true);
   const shape=recognize(s,pg);
   if(!shape) return remember(s,true);
+  const first=rs.out[0],last=rs.out[rs.out.length-1],gap=Math.hypot(last[0]-first[0],last[1]-first[1]);
   if(shape.t==="a"){
-    // A true deliberate arc: enough size/sweep, good fit, and one rotational direction.
-    const sweep=Math.abs(shape.d), r=shape.r;
-    if(diag<95||rs.tot<115||r<37||r>diag*3||sweep<.77||sweep>5.15)
-      return remember(s,true);
-    let residual=0,forward=0,backward=0;
+    const sweep=Math.abs(shape.d),r=shape.r;
+    if(diag<58||r<18||r>diag*4||sweep<.58||sweep>5.5) return remember(s,true);
+    let err=0,forward=0,backward=0;
     for(let i=0;i<rs.out.length;i++){
-      const q=rs.out[i]; residual+=Math.abs(Math.hypot(q[0]-shape.cx,q[1]-shape.cy)-r);
-      if(i){ const before=rs.out[i-1]; const d=normAng(Math.atan2(q[1]-shape.cy,q[0]-shape.cx)-Math.atan2(before[1]-shape.cy,before[0]-shape.cx));
-        if(d*shape.d>=0) forward+=Math.abs(d); else backward+=Math.abs(d); }
+      const p=rs.out[i];err+=Math.abs(Math.hypot(p[0]-shape.cx,p[1]-shape.cy)-r);
+      if(i){const q=rs.out[i-1],d=normAng(Math.atan2(p[1]-shape.cy,p[0]-shape.cx)-Math.atan2(q[1]-shape.cy,q[0]-shape.cx));
+        if(d*shape.d>=0) forward+=Math.abs(d);else backward+=Math.abs(d);}
     }
-    if(residual/rs.out.length>Math.max(2.4,r*.025)||backward>forward*.065)
-      return remember(s,true);
+    if(err/rs.out.length>Math.max(3.5,r*.045)||backward>forward*.12) return remember(s,true);
     return remember(shape,false);
   }
   if(shape.t==="o"||shape.t==="r"||(shape.t==="g"&&shape.closed)){
-    const closed=chord<=Math.max(17,diag*.18), wide=width>50&&height>50;
-    if(!closed||!wide||rs.tot<175||diag<94) return remember(s,true);
+    if(gap>Math.max(19,diag*.24)||width<44||height<44||rs.tot<130||diag<67) return remember(s,true);
     return remember(shape,false);
   }
   if(shape.t==="g"&&!shape.closed){
-    const v=shape.pts||[];
-    if(diag<120||v.length<6||v.length>10||rs.tot<145) return remember(s,true);
-    let good=true;
-    for(let i=2;i<v.length;i+=2) if(Math.hypot(v[i]-v[i-2],v[i+1]-v[i-1])<39) good=false;
-    if(good) return remember(shape,false);
+    if(diag<83||rs.tot<100||(shape.pts||[]).length<6) return remember(s,true);
+    return remember(shape,false);
   }
   return remember(s,true);
 }
@@ -1789,9 +2055,12 @@ function endPointer(e){
     case "cand": clearTimeout(a.timer); if(up&&!dimTap(a)) openPop(a.pg,a.item,e.clientX,e.clientY); return;
     case "grab": grabEnd(a); return;
     case "stroke": {
+      // Some iPad Pencil gestures deliver only pointerdown + pointerup. Capture the
+      // release position so even the quickest single-stroke line has two points.
+      if(up&&S.smartInk&&S.tool==="pen"&&!a.rec) addStrokePt(a,e);
       if(!up&&!a.rec&&a.stroke.p.length<6) return;
       const it=up&&S.smartInk&&S.tool==="pen"?smartInkEnd(a):a.rec||a.stroke;
-      commitAdd(a.pg,it); return;
+      if(it){ commitAdd(a.pg,it); if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")) queueCallig(a.pg,it); } return;
     }
     case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; commitAdd(a.pg,a.stroke); return; }
     case "shape": shapeEnd(a); return;
@@ -1825,7 +2094,7 @@ function drawLive(){
 }
 
 /* ---- freehand ---- */
-function strokeStart(a,e){ const hl=S.tool==="hl"; a.mode="stroke"; a.stroke={t:hl?"h":(S.penType==="ball"?"b":"p"),c:hl?S.hlColor:S.penColor,w:hl?HL_W[S.hlW]:PEN_W[S.penW],p:[]}; a.anchor=[a.x0,a.y0]; addStrokePt(a,e); armHold(a); drawLiveSoon(); }
+function strokeStart(a,e){ const hl=S.tool==="hl"; a.startedAt=performance.now(); a.mode="stroke"; a.stroke={t:hl?"h":(S.penType==="ball"?"b":"p"),c:hl?S.hlColor:S.penColor,w:hl?HL_W[S.hlW]:PEN_W[S.penW],p:[]}; a.anchor=[a.x0,a.y0]; addStrokePt(a,e); armHold(a); drawLiveSoon(); }
 function addStrokePt(a,e){
   if(a.rec) return; const [x,y]=localPt(e,a.rect,a.pg); const p=a.stroke.p, n=p.length;
   const pr=e.pointerType==="pen"?(e.pressure>0?e.pressure:.5):.5;
@@ -2219,7 +2488,7 @@ function startText(pg,item,x,y){
 }
 function positionTextEd(){
   if(!textEd) return; const {pg,it,ta}=textEd; const k=pg.el.getBoundingClientRect().width/W, fsCss=it.fs*k, sc=fsCss<16?fsCss/16:1;
-  ta.style.left=it.x*k+"px"; ta.style.top=it.y*k+"px"; ta.style.fontSize=(fsCss/sc)+"px"; ta.style.width=(it.tw*k/sc)+"px"; ta.style.color=it.c; ta.style.transform=sc<1?"scale("+sc+")":"";
+  ta.style.left=it.x*k+"px"; ta.style.top=it.y*k+"px"; ta.style.fontSize=(fsCss/sc)+"px"; ta.style.width=(it.tw*k/sc)+"px"; ta.style.color=it.c; ta.style.fontFamily=it.fam==="callig"?(CALLIG_FAMILIES[it.lang]||"Caveat, cursive"):"Rubik, system-ui, sans-serif"; ta.style.transform=sc<1?"scale("+sc+")":"";
   ta.style.height="auto"; ta.style.height=Math.max(it.fs*1.3*k/sc+2,ta.scrollHeight)+"px";
 }
 function finishText(){
@@ -2901,7 +3170,7 @@ async function init(){
   await loadLangSetting(); renderWhere();
   renderLib();
 }
-for(const id of ["appVer","appVer2"]){ const el=$(id); if(el) el.textContent="Kritzelei "+APP_VER; }
+for(const id of ["appVer","appVer2"]){ const el=$(id); if(el) el.textContent=tt("appName")+" "+APP_VER; }
 init();
 if("serviceWorker" in navigator){
   // look for a new version on start, every time the app comes back to the screen and every 30 minutes

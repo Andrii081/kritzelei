@@ -1,6 +1,6 @@
 {
-  "name": "Kritzelei",
-  "short_name": "Kritzelei",
+  "name": "Doodles",
+  "short_name": "Doodles",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

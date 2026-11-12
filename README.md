@@ -1,4 +1,4 @@
-# Kritzelei
+# Kritzelei v19 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -26,6 +26,12 @@
 - The switch persists on the same device. It is **off by default** to preserve current workflows and existing documents.
 - Recognition is geometric, not AI handwriting OCR. Small or ambiguous shapes may need the dedicated Line / Shapes tools; use Undo if a mark is misclassified.
 - All existing v15-v16 fixes are retained.
+
+## What's new in v19
+- **Single-stroke line correction:** one deliberate long pen stroke can become a straight editable line immediately upon lifting Pencil; no zigzag or holding necessary.
+- **Scratch-to-erase:** with Smart Ink enabled, rapidly scrub back and forth over EXISTING handwriting several times in one uninterrupted gesture. The affected ink is erased without changing tools; Undo restores it. Ordinary crosses, triangles and gestures over blank paper are not deleted. The PDF page background is protected.
+- **Localized title:** visible brand, browser tab, iPad app-title metadata and install manifests adapt to the chosen one of 15 languages. Note: an already-installed iPad Home Screen icon label is controlled by iPadOS and may need reinstallation to change; don't delete an app without first saving a backup.
+- **New app icon:** paper with a lively ink flourish and a pen; same icon for all 15 languages.
 
 ## Features
 - Notebooks with folders and search; paper: grid, lined, dots, graph paper, isometric, Cornell, blank
@@ -66,3 +72,14 @@ Included libraries (PDF.js, jsPDF) keep their own open-source licenses, see [THI
 
 ## Author
 Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
+
+
+## v19: Experimental multilingual calligraphy
+
+- The Pen toolbar has an optional **Beautiful handwriting / Calligraphy** checkbox (off by default). It is independent of Auto line/shape mode.
+- After a pause of 1.45 seconds, a *multi-stroke* group is locally recognized with Tesseract.js (selected language determines the model). Only high-confidence readings (80%+) are automatically replaced by a handwritten-style text object. Undo immediately restores ink.
+- To handle a single letter, Chinese character, Arabic glyph, or an uncertain reading, use **Lasso → Beautify selected handwriting** and review/edit the proposed text before replacing.
+- The first use of a given language requires internet to download the Tesseract.js engine and that language model; later uses may work from the browser cache. Recognition occurs on the iPad; images of handwriting are not sent to an OCR server. The OCR libraries are requested from jsDelivr; language models come from the Tesseract language-data CDN.
+- Supported recognition language codes: en, de, uk, ru, pl, tr, es, fr, it, pt, nl, ar, zh (Simplified), ja, ko. Recognition quality varies greatly by language/handwriting and is **not guaranteed**: Tesseract is primarily OCR for printed text, not professional Pencil handwriting recognition.
+- Calligraphic display uses Caveat for Latin/Cyrillic, Aref Ruqaa Ink for Arabic, Ma Shan Zheng for Chinese, Yuji Syuku for Japanese, and Nanum Pen Script for Korean. Fonts are requested from Google Fonts on demand; fallback fonts apply if offline.
+- The notebook and its PDF/export structure remain identical to v18. No changes are made to existing notes until the new feature is enabled.
