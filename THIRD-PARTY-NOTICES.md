@@ -277,3 +277,8 @@ Apache License
 ## Dynamically loaded recognition engine (v19)
 
 Tesseract.js v5 (Apache-2.0), Tesseract OCR engine and language models are fetched from external CDNs only when the user enables and uses the recognition feature. These external runtime dependencies are not distributed inside this ZIP. Tesseract.js: https://github.com/naptha/tesseract.js. Language data: https://github.com/tesseract-ocr/tessdata_fast. Font licensing is managed by Google Fonts at the time of download.
+
+
+## Web-loaded font: Pacifico (SIL Open Font License 1.1)
+
+App requests the Pacifico font via Google Fonts CSS when online; the font binaries are not distributed in this archive. Pacifico is designed by Vernon Adams and expanded to Cyrillic by Botjo Nikoltchev and Ani Petrova. Project: https://github.com/googlefonts/Pacifico . Font license: https://openfontlicense.org/ . Existing per-language fonts retain their original terms.

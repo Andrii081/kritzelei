@@ -1,4 +1,4 @@
-# Kritzelei v21 — Doodles / Каракули / Kritzelei
+# Kritzelei v22 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -100,3 +100,11 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - Each newly written glyph is modestly smoothed immediately. Individual high-confidence OCR letters use the true handwritten Google Fonts **Bad Script** face (Latin/Cyrillic) rather than a generic print font. Other writing remains ink. Font and OCR language models download from the web when needed.
 - External font use: Bad Script is distributed by Google Fonts under the SIL Open Font License 1.1, see https://github.com/google/fonts/tree/main/ofl/badscript ; no font binary is redistributed inside this package.
 - Actual iPad/Apple Pencil recognition still needs device testing.
+
+## v22 — numbers, pen weight, genuine crosses and cursive face
+
+- The optional handwriting OCR accepts **single digits 0–9** as well as characters; low-confidence symbols get a restricted numeric pass. A standalone closed oval is inherently ambiguous among 0/O/О; it stays as ink instead of being incorrectly replaced by D. In an existing numeric sequence, an oval is treated as 0. The manual lasso review can correct ambiguous readings.
+- Recognized calligraphy uses a connected handwriting typeface **Pacifico** for Latin and Cyrillic, and stores the original **inkW** to draw a colored outline preserving the chosen pen thickness. Other scripts use the existing writing fonts. The first font load needs an internet connection.
+- The X/Y system now recognizes **two intersecting pen lines**, not only shared endpoints. It snaps the cross's origin to the actual grid and preserves negative and positive halves. Additional Z support remains available.
+- Geometry metadata now survives closing and reopening the notebook.
+- OCR is still Tesseract, which is **not a reliable handwriting-recognition engine**; ambiguous or low-confidence readings are deliberately left untouched. Never expect universal or perfect conversion.
