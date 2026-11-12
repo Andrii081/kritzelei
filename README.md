@@ -1,4 +1,4 @@
-# Kritzelei v20 — Doodles / Каракули / Kritzelei
+# Kritzelei v21 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -93,3 +93,10 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - Lasso → Beautify selected handwriting opens a per-character review. Characters are separated by spaces; use `□` to keep an individual handwritten glyph. Corrections are applied only to validated single characters. Undo restores every replaced stroke.
 - **Limitations:** joined cursive letters or multiple connected characters cannot be segmented reliably without a specialized handwriting AI. For those, the app keeps original handwriting and merely smooths strokes. Tesseract.js is primarily printed-text OCR, so actual iPad handwriting recognition remains experimental and may rarely convert letters. The first OCR model download requires internet.
 - Previous PDFs, colored ink, calculators, icon and language-specific names remain unchanged.
+
+## Update v21 — restored automatic drawing + smooth handwriting
+- Pencil geometry recognition and calligraphy can now be enabled together. Every deliberate straight stroke is recognized without a hold gesture; near-horizontal and near-vertical strokes are snapped onto the sheet's grid lines. Two or three common-origin long axes are labeled X/Y/Z and placed on the grid.
+- Reworked deliberate scratch erase: multiple fast back-and-forth passes over pre-existing ink delete the touched strokes, with Undo, and can coexist with handwriting recognition. The separate scratch-erase switch remains available.
+- Each newly written glyph is modestly smoothed immediately. Individual high-confidence OCR letters use the true handwritten Google Fonts **Bad Script** face (Latin/Cyrillic) rather than a generic print font. Other writing remains ink. Font and OCR language models download from the web when needed.
+- External font use: Bad Script is distributed by Google Fonts under the SIL Open Font License 1.1, see https://github.com/google/fonts/tree/main/ofl/badscript ; no font binary is redistributed inside this package.
+- Actual iPad/Apple Pencil recognition still needs device testing.

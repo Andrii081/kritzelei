@@ -1,5 +1,10 @@
 # Third-party notices
 
+## Online handwriting font (v21)
+
+When network access is available, the application loads **Bad Script** from Google Fonts for Latin and Cyrillic handwriting. The font is provided remotely under the SIL Open Font License 1.1 (Copyright 2011 The Bad Script Project Authors). **No font file is bundled or redistributed in this repository.** Official license: https://github.com/google/fonts/blob/main/ofl/badscript/OFL.txt
+
+
 Kritzelei includes the following third-party software. These files keep their own licenses; the PolyForm Noncommercial license of Kritzelei does **not** apply to them.
 
 | File | Library | License |
