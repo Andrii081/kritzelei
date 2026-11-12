@@ -1,4 +1,4 @@
-# Kritzelei v22 — Doodles / Каракули / Kritzelei
+# Kritzelei v23 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -108,3 +108,14 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - The X/Y system now recognizes **two intersecting pen lines**, not only shared endpoints. It snaps the cross's origin to the actual grid and preserves negative and positive halves. Additional Z support remains available.
 - Geometry metadata now survives closing and reopening the notebook.
 - OCR is still Tesseract, which is **not a reliable handwriting-recognition engine**; ambiguous or low-confidence readings are deliberately left untouched. Never expect universal or perfect conversion.
+
+
+## v23 — long arrowheaded axes, erasable calligraphy, improved numerals
+
+- **Normal eraser now removes recognized calligraphy** (`t: "x"`) as a complete editable character, with both "Whole" and "Partial" eraser modes. The undo button restores erased characters. Imported image/PDF backgrounds remain protected.
+- **Large, hand-drawn X/Y coordinate crosses** are found from the two dominant intersecting stroke shafts, including rough Pencil traces with small arrowheads at the ends. A minimum long-stroke length and a real crossing help avoid converting ordinary handwriting into axes. The result is redrawn with tidy arrowheads, X/Y labels and exact graph-paper alignment. Arrow-tool strokes can also be recognized. A subsequent diagonal from the common origin can become Z.
+- **Digits 0–9** receive an additional digit-restricted OCR vote even when general OCR proposes a letter. Accepted digits use the handwritten **Caveat** display font rather than a regular printed numeral. Visible ink weight and selected pen color are retained. To avoid replacing O/О/D incorrectly, ambiguous standalone ovals remain handwriting unless numeric context exists.
+- **Irregular ink** receives stronger bounded smoothing, keeping sharp corners, original strokes, color and pressure. Uncertain recognition never deletes the original glyph. For an ambiguous character, select it with Lasso → Beautify selected handwriting and correct the result before replacing.
+- Supports the previous features for multi-page PDF notes, ⅓ A4 inserts, stylus calculator, color palette, natural handwriting and local backups.
+
+**Important:** Tesseract OCR remains a printed-text OCR engine, not a high-accuracy handwriting model. It is unable to guarantee reading badly formed letters/digits. The recognizer and bundled tests verify processing rules but not every user's handwriting. Test on the actual iPad/Apple Pencil and keep backup copies. Initial use of the OCR engine and font resources requires internet.

@@ -421,7 +421,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v22";
+const APP_VER="v23";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -595,6 +595,10 @@ function bbox(it){
     case "x": { const n=Math.max(1,textLines(it).length); b=[it.x,it.y,it.x+it.tw,it.y+n*it.fs*1.3]; break; }
     case "i": b=[it.x,it.y,it.x+it.iw,it.y+it.ih]; break;
     default: b=[0,0,0,0];
+  }
+  if(it.axisName&&(it.t==="p"||it.t==="b")){
+    // Include arrow and coordinate label in redraws and hit testing.
+    const e=it.p||[]; if(e.length>=6){const x=e[e.length-3],y=e[e.length-2];b=[Math.min(b[0],x-30),Math.min(b[1],y-38),Math.max(b[2],x+65),Math.max(b[3],y+44)];}
   }
   return (it._bb=b);
 }
@@ -814,7 +818,10 @@ const TFONT=(fs)=>fs+"px Rubik, system-ui, -apple-system, sans-serif";
 const CALLIG_FAMILIES={ar:'"Aref Ruqaa Ink", "Geeza Pro", serif',zh:'"Ma Shan Zheng", "Kaiti SC", serif',ja:'"Yuji Syuku", "Hiragino Mincho ProN", serif',ko:'"Nanum Pen Script", "Apple SD Gothic Neo", serif'};
 // Pacifico is a genuinely joined brush-script face with extended Cyrillic and Latin glyphs.
 const calligFont=(fs,lang)=>`${fs}px ${CALLIG_FAMILIES[lang]||'"Pacifico", "Caveat", "Noteworthy", cursive'}`;
-const fontForItem=(it)=>it.fam==="callig"?calligFont(it.fs,it.lang||"en"):TFONT(it.fs);
+// Handwritten digits should look written with a pen, not like printed numerals.
+// Caveat has a separate brush-script numeral design and ships through the existing font CSS.
+const glyphFont=(fs,lang,char)=>/^[0-9]$/.test(char)?`700 ${fs}px "Caveat", "Noteworthy", cursive`:calligFont(fs,lang);
+const fontForItem=(it)=>it.fam==="callig"?glyphFont(it.fs,it.lang||"en",String(it.text||"")):TFONT(it.fs);
 function textLines(it){
   const key=it.text+"|"+it.fs+"|"+it.tw+"|"+(it.fam||"")+"|"+(it.lang||"")+"|"+fontEpoch; if(it._lk===key) return it._lines;
   tctx.font=fontForItem(it); const out=[];
@@ -832,7 +839,7 @@ function drawText(ctx,it){
   // v22: preserve the pen's visible weight in recognition-generated calligraphy.
   // Plain typed text remains untouched. Stroke and fill use the *same* color.
   const cursive=it.fam==="callig";
-  if(cursive){ctx.strokeStyle=it.c;ctx.lineWidth=Math.max(.6,(it.inkW||3.6)*.67);
+  if(cursive){ctx.strokeStyle=it.c;ctx.lineWidth=Math.max(1.2,(it.inkW||3.6)*.82);
     ctx.lineJoin="round";ctx.lineCap="round";}
   if(it.glyphScaleX){ctx.translate(it.x,it.y);ctx.scale(it.glyphScaleX,1);}
   const left=it.glyphScaleX?0:it.x,top=it.glyphScaleX?0:it.y;
@@ -1034,6 +1041,12 @@ Object.assign(I18N.ru,{smartInkHint:"Одним штрихом выравнив�
 Object.assign(I18N.uk,{calligHint:"Рукописні літери та цифри, з товщиною вибраної ручки. Неоднозначні символи залишаються незмінними."});
 Object.assign(I18N.en,{calligHint:"Cursive script for characters and numbers, keeping the chosen pen thickness. Ambiguous 0/O/D stays as ink instead of a wrong replacement."});
 Object.assign(I18N.de,{calligHint:"Schreibschrift für Buchstaben und Ziffern mit gleicher Stiftstärke. Zweifelhafte Zeichen wie 0/O/D bleiben unverändert."});
+
+/* v23: clarify experimental recognition and new always-erasable calligraphy. */
+Object.assign(I18N.ru,{calligHint:"Пишет красивые отдельные буквы и цифры (цифры — рукописным шрифтом). Сильно неровный почерк сначала сглаживается; сомнительное распознавание не удаляет исходную запись. Любую заменённую букву можно стереть обычным ластиком.",smartInkHint:"Две длинные линии, пересекающиеся как крест, превращаются в оси X/Y со стрелками и привязкой к сетке. Стрелочки, дорисованные в конце, допустимы."});
+Object.assign(I18N.uk,{calligHint:"Покращення окремих рукописних літер та цифр; ненадійні результати залишаються рукописними. Перетворені символи стираються звичайною гумкою."});
+Object.assign(I18N.en,{calligHint:"Beautify individual handwritten letters and digits, while keeping uncertain strokes. Recognized characters can be erased with the normal eraser."});
+Object.assign(I18N.de,{calligHint:"Einzelne handgeschriebene Buchstaben und Ziffern glätten. Unsichere Zeichen bleiben im Original. Die normale Radierfunktion entfernt auch erkannte Zeichen."});
 const S={calcPos:null,calcDeg:true,pick:null,snap:true,scanMode:"color",nb:null,pages:[],tool:"pen",penColor:PEN_COLORS[0],hlColor:HL_COLORS[0],penW:1,hlW:1,finger:false,penType:"pen",autoShape:true,smartInk:true,scratchErase:true,calligInk:false,custom:[],erMode:"whole",erSize:1,txtSize:1,shape:"circle",zoom:1,folder:"",query:"",undo:[],redo:[],lnLen:null,lnAng:null,fix:{dia:null,bw:null,bh:null},sel:null,clip:null,arc:null,baseW:880};
 const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","scratchErase","calligInk","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
 try{ const pref=JSON.parse(localStorage.getItem("kritzelei.prefs")||"{}"); for(const k of PREF_KEYS) if(pref[k]!==undefined) S[k]=pref[k]; }catch(e){}
@@ -1807,7 +1820,7 @@ function beautifyInkStroke(it){
     const dx=x-p[j],dy=y-p[j+1],d=Math.hypot(dx,dy);
     const v1x=p[j]-p[j-3],v1y=p[j+1]-p[j-2],v2x=p[j+3]-p[j],v2y=p[j+4]-p[j+1];
     const c=(v1x*v2x+v1y*v2y)/Math.max(.01,Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y));
-    const cap=Math.min(c<.35?.5:2.8,d),f=d?cap/d:0;
+    const cap=Math.min(c<.15?.35:c<.55?1.2:4.6,d),f=d?cap/d:0;
     out[j]=Math.round((p[j]+dx*f)*10)/10;
     out[j+1]=Math.round((p[j+1]+dy*f)*10)/10;
     if(it.t==="p"){
@@ -1906,7 +1919,7 @@ function makeCalligGlyph(items,char,lang){
   const bb=strokeInkBounds(items),x=clamp(bb[0],3,W-30),y=Math.max(3,bb[1]-3);
   const height=Math.max(12,bb[3]-bb[1]),width=Math.max(9,bb[2]-bb[0]);
   let fs=clamp(height*1.2,18,88);
-  tctx.font=calligFont(fs,lang);
+  tctx.font=glyphFont(fs,lang,char);
   let measured=Math.max(1,tctx.measureText(char).width);
   // Place each glyph in its original location; do not reflow the word.
   const sx=clamp(width/measured,.56,1.50),tw=Math.max(13,Math.min(W-x-5,measured*sx+8));
@@ -1961,12 +1974,19 @@ async function recognizeCallig(pg,items,lang,manual){
       // A second OCR pass constrained to numbers is useful for numerals such as
       // 2/3/5/8, but a letter is *not* overwritten with a digit solely because
       // an isolated single-character OCR engine guessed one.
-      if((!char||confidence<72)&&!isAmbiguousOval(group)){
+      // A second single-character OCR vote limited to digits. This runs even
+      // when ordinary OCR confidently calls a crooked 2 'Z' or 5 'S'.
+      // Do not replace clear letters with numerals on a weak numeric guess.
+      if(!isAmbiguousOval(group)){
         try{
-          await worker.setParameters({tessedit_char_whitelist:"0123456789"});
+          await worker.setParameters({tessedit_char_whitelist:"0123456789",tessedit_pageseg_mode:"10"});
           const n=await worker.recognize(img.image),nc=oneGlyph(n?.data?.text,lang),cf=Number(n?.data?.confidence)||0;
-          if(/^[0-9]$/.test(nc)&&cf>=Math.max(83,confidence+14)){char=nc;confidence=cf;}
-        }finally{await worker.setParameters({tessedit_char_whitelist:""});}
+          const numberContext=nearKnownDigit(pg,group);
+          const looksLikeDigit=/^[0-9]$/.test(char);
+          if(/^[0-9]$/.test(nc) && (looksLikeDigit&&cf>=65||
+               cf>=Math.max(numberContext?73:88,confidence+(numberContext?-5:7)) ||
+               (!char&&cf>=79))){char=nc;confidence=Math.max(cf,confidence);}
+        }finally{await worker.setParameters({tessedit_char_whitelist:"",tessedit_pageseg_mode:"10"});}
       }
       if(isAmbiguousOval(group)){
         // A stand-alone oval may be O / Cyrillic О / 0. Preserve the original
@@ -1980,7 +2000,7 @@ async function recognizeCallig(pg,items,lang,manual){
     if(manual){toast("");showGlyphReview(pg,results,lang);return;}
     if(!S.calligInk||LANG!==lang||(act&&act.pg===pg))return;
     // Only high-confidence *single characters*, never OCR-produced words.
-    const reliable=results.filter(r=>r.char&&r.confidence>=80);
+    const reliable=results.filter(r=>r.char&&r.confidence>=(/^[0-9]$/.test(r.char)?76:80));
     if(reliable.length){await loadCalligFont(lang,40);replaceCalligGlyphs(pg,reliable,lang);}
   }catch(e){console.warn("Single-character handwriting recognition unavailable:",e);if(manual)toast(tt("calligLoadError"),4500);}
   finally{ocrBusy=false;clearTimeout(notify);const msg=$("toast");if(msg&&msg.textContent===tt("calligWorking"))msg.classList.remove("on");}
@@ -2011,7 +2031,7 @@ function calligSelected(){
 }
 $("calligReview").addEventListener("click",e=>{if(e.target===$("calligReview"))$("calligKeep").click();});
 
-/* v22: Correct numeric glyph support (0-9); ambiguous oval protected against
+/* v23: Correct numeric glyph support (0-9); ambiguous oval protected against
    mistaken D/O, and a dedicated numeric OCR retry for unclear digits. New
    calligraphy items retain pen width; crosses intersect anywhere on the line. */
 /* ================= v18 smart ink: genuine single-stroke lines + scratch erase =================
@@ -2070,67 +2090,107 @@ function straightStroke(stroke,points,pg){
    rays from a common endpoint. The old endpoint-only test missed real crosses.
    Snap the intersection to the nearest grid node; retain both negative halves.
    This is deliberately local geometry, not OCR or an AI model. */
-function lineDirection(it){
-  if(!it||!it.p||it.p.length!==6||!(it.autoLine||it.axisName))return null;
-  const p=it.p,dx=p[3]-p[0],dy=p[4]-p[1],len=Math.hypot(dx,dy);
-  if(len<48)return null;
-  return {it,dx,dy,len,angle:Math.atan2(dy,dx),ends:[[p[0],p[1]],[p[3],p[4]]],
-    xMin:Math.min(p[0],p[3]),xMax:Math.max(p[0],p[3]),
-    yMin:Math.min(p[1],p[4]),yMax:Math.max(p[1],p[4])};
+// v23: a coordinate cross is formed from two long pen strokes, even if the
+// Pencil points include bent arrowheads at their ends, or the lines are not
+// perfectly perpendicular. These candidate tests work on raw ink as well as
+// on strokes already straightened by Smart Ink.
+function axisSpine(it){
+  if(!it || (it.t!=="p"&&it.t!=="b"&&it.t!=="g"))return null;
+  const pts=it.t==="g" ? (it.pts||[]).reduce((out,v,i,a)=>{if(i%2===0&&Number.isFinite(v)&&Number.isFinite(a[i+1]))out.push([v,a[i+1]]);return out;},[]) : inkPoints(it);
+  if(pts.length<2)return null;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const q of pts){minX=Math.min(minX,q[0]);minY=Math.min(minY,q[1]);maxX=Math.max(maxX,q[0]);maxY=Math.max(maxY,q[1]);}
+  const dx=maxX-minX,dy=maxY-minY;
+  if(Math.max(dx,dy)<92)return null;
+  const horizontal=dx>dy*2.1,vertical=dy>dx*2.1;
+  if(!horizontal&&!vertical)return null;
+  const long=horizontal?dx:dy;
+  if(pts.length===2){
+    return {it,kind:horizontal?"x":"y",low:horizontal?minX:minY,
+      high:horizontal?maxX:maxY,mid:horizontal?(pts[0][1]+pts[1][1])/2:(pts[0][0]+pts[1][0])/2,len:long};
+  }
+  const middle=pts.filter(q=>{
+    const z=horizontal?q[0]:q[1],lo=horizontal?minX:minY;
+    return z>=lo+long*.16&&z<=lo+long*.84;
+  });
+  if(middle.length<2)return null;
+  const values=middle.map(q=>horizontal?q[1]:q[0]).sort((a,b)=>a-b);
+  const mid=values[Math.floor(values.length/2)];
+  const tol=Math.max(9,Math.min(22,long*.10));
+  const good=pts.filter(q=>Math.abs((horizontal?q[1]:q[0])-mid)<=tol);
+  if(good.length<Math.max(2,Math.ceil(pts.length*.59)))return null;
+  // Line spans are measured on points near the shaft, excluding arrowhead excursions.
+  const extremes=good.map(q=>horizontal?q[0]:q[1]);
+  const low=Math.min(...extremes),high=Math.max(...extremes);
+  if(high-low<82)return null;
+  return {it,kind:horizontal?"x":"y",low,high,mid,len:high-low};
 }
-function axisKind(line){
-  if(!line)return "";
-  const ax=Math.abs(line.dx)/line.len,ay=Math.abs(line.dy)/line.len;
-  return ax>.84?"x":ay>.84?"y":"z";
+function axisIntersection(xLine,yLine,pg){
+  const rawX=yLine.mid,rawY=xLine.mid;
+  // Require the crossing to actually fall inside both strokes (allow small pen overshoot).
+  const margin=Math.min(20,Math.min(xLine.len,yLine.len)*.10);
+  if(rawX<xLine.low-margin||rawX>xLine.high+margin||rawY<yLine.low-margin||rawY>yLine.high+margin)return null;
+  return [paperSnapX(rawX,pg),paperSnapY(rawY,pg)];
+}
+function lineDirection(it){
+  const sp=axisSpine(it);
+  if(sp)return {it,dx:sp.kind==="x"?sp.high-sp.low:0,dy:sp.kind==="y"?sp.high-sp.low:0,
+    len:sp.len,ends:sp.kind==="x"?[[sp.low,sp.mid],[sp.high,sp.mid]]:[[sp.mid,sp.low],[sp.mid,sp.high]]};
+  if(!it||it.t!=="p"||!it.p||it.p.length<6)return null;
+  const p=it.p,dx=p[p.length-3]-p[0],dy=p[p.length-2]-p[1],len=Math.hypot(dx,dy);
+  return len>75?{it,dx,dy,len,ends:[[p[0],p[1]],[p[p.length-3],p[p.length-2]]]}:null;
 }
 function snapAxes(pg,latest){
-  const b=lineDirection(latest);
-  if(!S.smartInk||!b||!pg||pg.strokes.indexOf(latest)<0)return;
-  const kindB=axisKind(b);
-  if(latest.axisName||!kindB)return;
+  if(!S.smartInk||!pg||!latest||!pg.strokes.includes(latest))return false;
+  // Work even if the most recent stroke is an unrecognized pencil line.
+  const b=axisSpine(latest);
+  if(!b){
+    // Preserve the third, diagonal Z axis when it begins at an existing X/Y cross.
+    const xs=pg.strokes.find(it=>it.axisName==="x"),ys=pg.strokes.find(it=>it.axisName==="y");
+    if(!xs||!ys||latest.axisName)return false;
+    const xsp=axisSpine(xs),ysp=axisSpine(ys),ln=lineDirection(latest);
+    if(!xsp||!ysp||!ln)return false;
+    const o=[paperSnapX(ysp.mid,pg),paperSnapY(xsp.mid,pg)];
+    const near=ln.ends.reduce((best,p)=>Math.hypot(p[0]-o[0],p[1]-o[1])<Math.hypot(best[0]-o[0],best[1]-o[1])?p:best,ln.ends[0]);
+    const far=ln.ends[0]===near?ln.ends[1]:ln.ends[0];
+    const vx=far[0]-o[0],vy=far[1]-o[1],len=Math.hypot(vx,vy);
+    if(Math.hypot(near[0]-o[0],near[1]-o[1])>30||len<82||Math.min(Math.abs(vx),Math.abs(vy))<len*.27)return false;
+    const before=pg.strokes.slice(),idx=pg.strokes.indexOf(latest);
+    pg.strokes[idx]={t:"p",c:latest.c,w:latest.w||PEN_W[S.penW],p:[o[0],o[1],.5,far[0],far[1],.5],axisName:"z",autoLine:Date.now()};
+    redraw(pg);commitPage(pg,before);return true;
+  }
   const before=pg.strokes.slice();
-  let candidate=null;
-  for(let i=pg.strokes.length-2;i>=Math.max(0,pg.strokes.length-28);i--){
-    const a=lineDirection(pg.strokes[i]);
-    if(!a||a.it===latest||Math.abs((latest.autoLine||0)-(a.it.autoLine||0))>90000)continue;
-    const kindA=axisKind(a);
-    if((kindA==="x"&&kindB==="y")||(kindA==="y"&&kindB==="x")){
-      const xLine=kindA==="x"?a:b,yLine=kindA==="y"?a:b;
-      const ix=(yLine.ends[0][0]+yLine.ends[1][0])/2;
-      const iy=(xLine.ends[0][1]+xLine.ends[1][1])/2;
-      // True crossing, anywhere on either segment, with minor overshoot allowed.
-      if(ix<xLine.xMin-16||ix>xLine.xMax+16||iy<yLine.yMin-16||iy>yLine.yMax+16)continue;
-      const deviation=Math.abs(xLine.dy)/xLine.len+Math.abs(yLine.dx)/yLine.len;
-      if(!candidate||deviation<candidate.dev)candidate={a,b,xLine,yLine,ix,iy,dev:deviation};
+  let pair=null;
+  for(let i=pg.strokes.length-2;i>=Math.max(0,pg.strokes.length-100);i--){
+    const old=pg.strokes[i],a=axisSpine(old);
+    if(!a||a.kind===b.kind)continue;
+    const xl=a.kind==="x"?a:b,yl=a.kind==="y"?a:b;
+    const o=axisIntersection(xl,yl,pg);
+    if(!o)continue;
+    // Prefer a nearby cross; a random line a whole page away is not an axis.
+    const score=Math.hypot((xl.low+xl.high)/2-o[0],(yl.low+yl.high)/2-o[1]);
+    if(!pair||score<pair.score)pair={xl,yl,origin:o,score};
+  }
+  if(!pair)return false;
+  const {xl,yl,origin}=pair;
+  const put=(sp)=>{
+    const it=sp.it,index=pg.strokes.indexOf(it);
+    if(index<0)return;
+    let x0,y0,x1,y1;
+    if(sp.kind==="x"){
+      x0=paperSnapX(sp.low,pg);x1=paperSnapX(sp.high,pg);
+      y0=y1=origin[1];
+    }else{
+      x0=x1=origin[0];y0=paperSnapY(sp.high,pg);y1=paperSnapY(sp.low,pg);
     }
-  }
-  if(candidate){
-    const c=candidate,origin=[paperSnapX(c.ix,pg),paperSnapY(c.iy,pg)];
-    // Keep both halves of a cross: positive X points right, positive Y points up.
-    const fix=(ln,kind)=>{
-      const old=ln.it,nd={...old,p:old.p.slice(),axisName:kind,autoLine:old.autoLine||Date.now()};
-      if(kind==="x")nd.p=[paperSnapX(ln.xMin,pg),origin[1],.5,paperSnapX(ln.xMax,pg),origin[1],.5];
-      else nd.p=[origin[0],paperSnapY(ln.yMax,pg),.5,origin[0],paperSnapY(ln.yMin,pg),.5];
-      delete nd._bb;delete nd._pp;delete nd._ppk;delete nd._e;
-      pg.strokes[pg.strokes.indexOf(old)]=nd;
-    };
-    fix(c.xLine,"x");fix(c.yLine,"y");
-    redraw(pg);commitPage(pg,before);return;
-  }
-  // An optional third diagonal ray can become Z once X and Y are established.
-  if(kindB!=="z")return;
-  const xs=pg.strokes.find(it=>it.axisName==="x"),ys=pg.strokes.find(it=>it.axisName==="y");
-  if(!xs||!ys)return;
-  const xline=lineDirection(xs),yline=lineDirection(ys);
-  if(!xline||!yline)return;
-  const origin=[yline.ends[0][0],xline.ends[0][1]];
-  const near=b.ends.find(p=>Math.hypot(p[0]-origin[0],p[1]-origin[1])<30);
-  if(!near)return;
-  const far=b.ends[0]===near?b.ends[1]:b.ends[0];
-  const nd={...latest,p:[origin[0],origin[1],.5,far[0],far[1],.5],axisName:"z"};
-  delete nd._bb;delete nd._pp;delete nd._ppk;delete nd._e;
-  pg.strokes[pg.strokes.indexOf(latest)]=nd;
+    const nd={t:"p",c:it.c,w:it.w||PEN_W[S.penW],p:[x0,y0,.5,x1,y1,.5],
+      axisName:sp.kind,autoLine:it.autoLine||Date.now()};
+    pg.strokes[index]=nd;
+  };
+  put(xl);put(yl);
+  // One atomic undo step converts the two raw strokes into a snapped coordinate cross.
   redraw(pg);commitPage(pg,before);
+  return true;
 }
 
 function eraseGestureMetrics(points,elapsed){
@@ -2329,11 +2389,11 @@ function endPointer(e){
       if(it){
         if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")) it=beautifyInkStroke(it);
         commitAdd(a.pg,it);
-        if(up&&S.smartInk&&it.autoLine) snapAxes(a.pg,it);
+        if(up&&S.smartInk) snapAxes(a.pg,it);
         if(up&&S.calligInk&&S.tool==="pen"&&(it.t==="p"||it.t==="b")&&!it.autoLine) queueCallig(a.pg,it);
       } return;
     }
-    case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; commitAdd(a.pg,a.stroke); return; }
+    case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; commitAdd(a.pg,a.stroke); if(up&&S.smartInk) snapAxes(a.pg,a.stroke); return; }
     case "shape": shapeEnd(a); return;
     case "arc2": arc2End(a); return;
     case "erase": commitPage(a.pg,a.before); return;
@@ -2608,9 +2668,9 @@ function eraseTo(a,x,y){ const [lx,ly]=a.er, R=ER_R[S.erSize], d=Math.hypot(x-lx
 function eraseAt(a,x,y){
   const pg=a.pg, R=ER_R[S.erSize], hit=[];
   for(let i=pg.strokes.length-1;i>=0;i--){
-    const it=pg.strokes[i]; if(it.t==="x"||it.t==="i") continue;
+    const it=pg.strokes[i]; if(it.t==="i") continue; // Recognized calligraphy is erasable; imported images stay protected.
     if(!hitItem(it,x,y,R)) continue;
-    if(S.erMode==="whole"||it.t==="d"||it.t==="q"){ pg.strokes.splice(i,1); hit.push(it); continue; }
+    if(S.erMode==="whole"||it.t==="x"||it.t==="d"||it.t==="q"){ /* Text glyphs erase atomically in both eraser modes. */ pg.strokes.splice(i,1); hit.push(it); continue; }
     const parts=splitErase(it,x,y,R); if(parts){ pg.strokes.splice(i,1,...parts); hit.push(it); }
   }
   if(hit.length) redrawRect(pg,unionBB(hit));
@@ -2759,7 +2819,7 @@ function startText(pg,item,x,y){
 }
 function positionTextEd(){
   if(!textEd) return; const {pg,it,ta}=textEd; const k=pg.el.getBoundingClientRect().width/W, fsCss=it.fs*k, sc=fsCss<16?fsCss/16:1;
-  ta.style.left=it.x*k+"px"; ta.style.top=it.y*k+"px"; ta.style.fontSize=(fsCss/sc)+"px"; ta.style.width=(it.tw*k/sc)+"px"; ta.style.color=it.c; ta.style.fontFamily=it.fam==="callig"?(CALLIG_FAMILIES[it.lang]||"Pacifico, Caveat, cursive"):"Rubik, system-ui, sans-serif"; ta.style.transform=sc<1?"scale("+sc+")":"";
+  ta.style.left=it.x*k+"px"; ta.style.top=it.y*k+"px"; ta.style.fontSize=(fsCss/sc)+"px"; ta.style.width=(it.tw*k/sc)+"px"; ta.style.color=it.c; ta.style.fontFamily=it.fam==="callig"?(/^[0-9]$/.test(it.text||"")?"Caveat, Noteworthy, cursive":(CALLIG_FAMILIES[it.lang]||"Pacifico, Caveat, cursive")):"Rubik, system-ui, sans-serif"; ta.style.transform=sc<1?"scale("+sc+")":"";
   ta.style.height="auto"; ta.style.height=Math.max(it.fs*1.3*k/sc+2,ta.scrollHeight)+"px";
 }
 function finishText(){
