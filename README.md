@@ -1,4 +1,4 @@
-# Kritzelei v28 — Doodles / Каракули / Kritzelei
+# Kritzelei v30 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -143,8 +143,14 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - Все остальные функции v25 сохранены.
 
 
-## v28 — automatic equals sign
+## v30 — automatic equals sign
 - Two separate short, approximately horizontal pen strokes are recognized as `=` whether or not Smart Ink is enabled. Draw the second within about 30 seconds of the first, in the same color and nearby.
 - Recognition uses the original Pencil path rather than the already-snapped smart line. The completed symbol has equal-length parallel strokes, centered between graph-paper lines (inside a 5-mm square, or a major square on millimeter paper).
 - Stroke width/color are preserved; both bars are real ink saved with the notebook, included in PDF export, erasable, and restored together with a single Undo of the recognition.
 - This uses geometric pattern recognition, not OCR. It deliberately excludes long coordinate axes. If the pair is very curved, far apart or not parallel, it stays as written.
+
+## v31 — short strokes stay freehand
+- On a standard squared page, **one cell is 5 mm**. The automatic line-straightening and paper-grid attraction work only for strokes **strictly longer than two cells (10 mm)**. At 10 mm or less, the original pen path is kept.
+- The ruler's **Line** tool remains a straight-line tool by design, but its start/end points are not magnetically snapped or angle-rounded while the line is two cells or shorter. Explicit numeric length/angle settings still apply.
+- The threshold follows the current sheet: one tiny mm-grid square is 1 mm; ruled paper uses its line spacing. Existing notes are not rewritten.
+- The purposeful `=` recognizer is unchanged: it can still form a neat mathematical equals sign from two short bars or a compact single-stroke gesture. Coordinate axes, scratch erase, smart selection, PDF and calculators remain.

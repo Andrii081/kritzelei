@@ -1,4 +1,4 @@
-const VERSION = "kritzelei-v28";
+const VERSION = "kritzelei-v31";
 const SHELL = ["./", "index.html", "jspdf.umd.min.js", "pdf.min.js", "pdf.worker.min.js", "jsQR.min.js", "manifest.webmanifest", "manifest-en.webmanifest", "manifest-de.webmanifest", "manifest-uk.webmanifest", "manifest-ru.webmanifest", "manifest-pl.webmanifest", "manifest-tr.webmanifest", "manifest-es.webmanifest", "manifest-fr.webmanifest", "manifest-it.webmanifest", "manifest-pt.webmanifest", "manifest-nl.webmanifest", "manifest-ar.webmanifest", "manifest-zh.webmanifest", "manifest-ja.webmanifest", "manifest-ko.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));

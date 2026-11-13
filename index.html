@@ -420,7 +420,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v28";
+const APP_VER="v31";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -575,6 +575,8 @@ function paperSnapX(x,pg){
 }
 function snapNear(v,axis,pg){ const s=axis==="x"?paperSnapX(v,pg):paperSnapY(v,pg); return Math.abs(s-v)<1.3*MM?s:v; }
 function alignToPaper(p,pg){ // p: [x0,y0,_,x1,y1,_]
+  // v31: do not magnetically align any line of two grid cells or less.
+  if(Math.hypot(p[3]-p[0],p[4]-p[1])<=twoCellLineThreshold(pg))return;
   if(Math.abs(p[4]-p[1])<.6 && Math.abs(p[3]-p[0])>=.6){ const y=paperSnapY(p[1],pg); p[1]=y; p[4]=y; }
   else if(Math.abs(p[3]-p[0])<.6 && Math.abs(p[4]-p[1])>=.6){ const x=paperSnapX(p[0],pg); p[0]=x; p[3]=x; }
 }
@@ -759,6 +761,8 @@ function axisGridCell(pg){
   if(paper==="lined"||paper==="cornell")return 8*MM;
   return 5*MM;
 }
+// One cell means one real paper division. Strictly more than two cells to snap.
+function twoCellLineThreshold(pg){return 2*axisGridCell(pg);}
 function axisGeometry(it){
   if(!it||!(["x","y","z"].includes(it.axisName))||!it.p||it.p.length!==6)return null;
   const pp=it.p,cell=Number(it.axisCell)||5*MM,unit=(Number.isFinite(cell)&&cell>0)?cell:5*MM;
@@ -1845,7 +1849,7 @@ function recognize(stroke,pg){
   const D=Math.hypot(x1-x0,y1-y0)||1, A=pts[0], B=pts[pts.length-1], se=Math.hypot(B[0]-A[0],B[1]-A[1]);
   const mk=(o)=>Object.assign(o,{c:stroke.c,w:stroke.w});
   let maxDev=0; for(const q of pts) maxDev=Math.max(maxDev,segDist(q[0],q[1],A[0],A[1],B[0],B[1]));
-  if(se>20&&maxDev<=Math.max(4,.07*se)){
+  if(se>twoCellLineThreshold(pg)&&maxDev<=Math.max(4,.07*se)){
     let ang=Math.atan2(B[1]-A[1],B[0]-A[0]); const sn=Math.round(ang/(Math.PI/4))*(Math.PI/4); if(Math.abs(ang-sn)<6*Math.PI/180) ang=sn;
     const P=[A[0],A[1],.5,A[0]+Math.cos(ang)*se,A[1]+Math.sin(ang)*se,.5]; alignToPaper(P,pg);
     return {t:stroke.t==="h"?"h":"p",c:stroke.c,w:stroke.w,p:P};
@@ -1918,8 +1922,8 @@ function straightStroke(stroke,points,pg){
   if(points.length<2)return null;
   const first=points[0], last=points[points.length-1];
   const chord=Math.hypot(last[0]-first[0],last[1]-first[1]);
-  const minLength=26;
-  if(chord<minLength)return null;
+  // v31: handwriting shorter than or exactly two cells stays untouched.
+  if(chord<=twoCellLineThreshold(pg))return null;
   const rs=resample(points,Math.max(16,Math.min(96,points.length*2)));
   if(!rs||rs.tot/chord>1.30)return null;
   let dev=0,peak=0;
@@ -2156,65 +2160,67 @@ function equalCellCenterX(pg,x,cell){
   if(!["grid","dots","mm"].includes(paper))return x;
   return (Math.floor(x/cell)+.5)*cell;
 }
+/* v29: Disambiguate a short mathematical Z-like equals GESTURE from
+   a normal Z by its compact, wide-and-shallow aspect ratio. A compact
+   handwritten Z with the exact same shape is inherently ambiguous, so
+   uncertain samples always remain original handwriting. */
 function equalOneStrokeSource(stroke,pg){
-  if(!stroke||!( ["p","b"].includes(stroke.t) ))return null;
-  const pts0=inkPoints(stroke);if(pts0.length<5)return null;
-  const pts=[pts0[0]];
-  for(let i=1;i<pts0.length;i++){
-    const p=pts0[i],q=pts[pts.length-1];
-    if(Math.hypot(p[0]-q[0],p[1]-q[1])>=1.2)pts.push(p);
+  if(!stroke||!(["p","b"].includes(stroke.t)))return null;
+  const raw=inkPoints(stroke);if(raw.length<5)return null;
+  const pts=[raw[0]];
+  for(let i=1;i<raw.length;i++){
+    const p=raw[i],q=pts[pts.length-1];
+    if(Math.hypot(p[0]-q[0],p[1]-q[1])>1.1)pts.push(p);
   }
   if(pts.length<5)return null;
-  let minX=pts[0][0],maxX=pts[0][0],minY=pts[0][1],maxY=pts[0][1],path=0;
-  for(let i=1;i<pts.length;i++){
-    const p=pts[i]; minX=Math.min(minX,p[0]); maxX=Math.max(maxX,p[0]); minY=Math.min(minY,p[1]); maxY=Math.max(maxY,p[1]);
-    path+=Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1]);
+  const cell=pagePaper(pg)==="mm"?5*MM:axisGridCell(pg);
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,length=0;
+  const cum=[0];
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);
+    minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);
+    if(i)length+=Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1]);
+    if(i)cum.push(length);
   }
-  const w=maxX-minX,h=maxY-minY,cell=pagePaper(pg)==="mm"?5*MM:axisGridCell(pg);
-  if(w<12||w>Math.max(cell*2.3,92)||h<4||h>Math.max(cell*.95,26)||path<w*1.45)return null;
-  const diffs=[];
-  const norm=a=>{while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;};
-  for(let k=2;k<pts.length-2;k++){
-    const a1=Math.atan2(pts[k][1]-pts[k-2][1],pts[k][0]-pts[k-2][0]);
-    const a2=Math.atan2(pts[k+2][1]-pts[k][1],pts[k+2][0]-pts[k][0]);
-    diffs.push({k,d:Math.abs(norm(a2-a1))});
+  const width=maxX-minX,height=maxY-minY;
+  if(width<12||width>Math.max(cell*4.1,92)||height<4||height>Math.max(cell*1.22,28)||
+     width<height*1.62||length<width*1.48)return null;
+  const segment=(i,j)=>{
+    const s=pts[i],e=pts[j],dx=e[0]-s[0],dy=e[1]-s[1],len=Math.hypot(dx,dy);
+    let error=0;
+    for(let k=i;k<=j;k++)error=Math.max(error,segDist(pts[k][0],pts[k][1],s[0],s[1],e[0],e[1]));
+    return {dx,dy,len,path:cum[j]-cum[i],error,ymid:(s[1]+e[1])/2};
+  };
+  // A continuous equals gestures has 3 principal parts. Locate the two
+  // turning points as an early horizontal extremum and a later opposite
+  // extremum; using absolute geometric extrema is robust to iPad coalescing.
+  for(const dir of [1,-1]){
+    let i=-1,peak=-Infinity;
+    for(let k=1;k<pts.length-3;k++){
+      if(cum[k]<length*.12||cum[k]>length*.58)continue;
+      const x=dir*pts[k][0];if(x>peak){peak=x;i=k;}
+    }
+    if(i<1)continue;
+    let j=-1,low=Infinity;
+    for(let k=i+2;k<pts.length-1;k++){
+      if(cum[k]<length*.46||cum[k]>length*.9)continue;
+      const x=dir*pts[k][0];if(x<low){low=x;j=k;}
+    }
+    if(j<0)continue;
+    const a=segment(0,i),diagonal=segment(i,j),c=segment(j,pts.length-1);
+    const horizontal=e=>e.len>=8&&dir*e.dx>7&&Math.abs(e.dy)<Math.max(4,e.len*.28)&&
+      e.error<Math.max(3.8,e.len*.16)&&e.path<e.len*1.48;
+    if(!horizontal(a)||!horizontal(c))continue;
+    if(dir*diagonal.dx>-5||Math.abs(diagonal.dy)<4||
+       diagonal.len>(a.len+c.len)*.98)continue;
+    const sep=Math.abs(a.ymid-c.ymid);
+    if(sep<Math.max(4,cell*.16)||sep>Math.max(24,cell*1.15))continue;
+    if(Math.max(a.len,c.len)/Math.min(a.len,c.len)>2.2)continue;
+    if((a.len+c.len)/length<.49)continue;
+    return {cx:(minX+maxX)/2,cy:(minY+maxY)/2,
+      width:Math.min(Math.max((a.len+c.len)/2,cell*.58),cell*1.55),cell};
   }
-  diffs.sort((a,b)=>b.d-a.d);
-  let corners=[];
-  for(const c of diffs){
-    if(c.d<0.42)break;
-    if(corners.every(v=>Math.abs(v-c.k)>2))corners.push(c.k);
-    if(corners.length===2)break;
-  }
-  if(corners.length<2)return null;
-  corners.sort((a,b)=>a-b);
-  const [i,j]=corners;
-  if(i<1||j>=pts.length-1||j-i<1)return null;
-  const segments=[pts.slice(0,i+1),pts.slice(i,j+1),pts.slice(j)];
-  const stats=segments.map(seg=>{
-    const s=seg[0],e=seg[seg.length-1];
-    const dx=e[0]-s[0],dy=e[1]-s[1],len=Math.hypot(dx,dy);
-    let plen=0,err=0;
-    for(let t=1;t<seg.length;t++)plen+=Math.hypot(seg[t][0]-seg[t-1][0],seg[t][1]-seg[t-1][1]);
-    for(const q of seg)err=Math.max(err,segDist(q[0],q[1],s[0],s[1],e[0],e[1]));
-    return {s,e,dx,dy,len,plen,err};
-  });
-  const [s1,s2,s3]=stats;
-  const h1=s1.len>=8 && Math.abs(s1.dy)<=Math.max(3.5,s1.len*.28) && s1.err<=Math.max(4.5,s1.len*.18) && s1.plen<=s1.len*1.5;
-  const h3=s3.len>=8 && Math.abs(s3.dy)<=Math.max(3.5,s3.len*.28) && s3.err<=Math.max(4.5,s3.len*.18) && s3.plen<=s3.len*1.5;
-  const diag=s2.len>=4 && Math.abs(s2.dx)>=4 && Math.abs(s2.dy)>=3 && Math.abs(s2.dy)<=Math.max(h*1.2,20);
-  if(!(h1&&h3&&diag))return null;
-  const horizShare=(s1.len+s3.len)/(path||1);
-  if(horizShare<0.54)return null;
-  const ysep=Math.abs((s1.s[1]+s1.e[1])/2-(s3.s[1]+s3.e[1])/2);
-  if(ysep<Math.max(4,cell*.14)||ysep>Math.max(20,cell*.9))return null;
-  if(Math.max(s1.len,s3.len)/Math.max(1,Math.min(s1.len,s3.len))>2.2)return null;
-  // Must fit like a compact math sign, not a full handwritten Z character.
-  if(h>cell*.82 || w>cell*2.1) return null;
-  // The diagonal connector should merely link the two bars, not dominate.
-  if(s2.len > (s1.len+s3.len)*0.9) return null;
-  const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
-  return {cx,cy,width:Math.min(Math.max((s1.len+s3.len)/2,cell*.58),cell*1.35),cell};
+  return null;
 }
 function tryCommitEquals(pg,raw,item){
   if(!pg||!item||item.axisName||item.eqGroup)return false;
@@ -2556,6 +2562,10 @@ pagesEl.addEventListener("pointerdown",(e)=>{
       act=a;return;
     }
   }
+  if(S.sel&&S.tool==="pen"&&S.sel.pg===pg&&!pointInSelBox(pg,x,y)){
+    clearSel();
+    return;
+  }
   if(textEd){ finishText(); if(S.tool==="text"||fingerNav) return; }
   if(pop) closePop();
   const arcWaiting=S.tool==="shape"&&S.arc&&S.arc.stage==="wait2";
@@ -2638,6 +2648,7 @@ function endPointer(e){
         }
         commitAdd(a.pg,it);
         if(up&&S.smartInk) snapAxes(a.pg,it);
+        if(up&&S.tool==="pen"&&!a.rec) tryAutoAreaSelect(a.pg,a.stroke,it);
       } return;
     }
     case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; commitAdd(a.pg,a.stroke); if(up&&S.smartInk) snapAxes(a.pg,a.stroke); return; }
@@ -2684,9 +2695,25 @@ function addStrokePt(a,e){
 function armHold(a){ clearTimeout(a.holdT); if(S.smartInk&&S.tool==="pen") return; if(!S.autoShape&&S.tool!=="hl") return; a.holdT=setTimeout(()=>{ if(act!==a||a.rec) return; const r=recognize(a.stroke,a.pg); if(r){ a.rec=r; vibrate(); drawLive(); } },520); }
 
 /* ---- line ---- */
-function lineStart(a){ a.mode="line"; a.mg={}; a.endSnap=null; a.stroke={t:"p",c:S.penColor,w:PEN_W[S.penW],p:[]}; const sn=snapPt(a.pg,a.x0,a.y0), g=sn?null:snapStart(a.pg,a.x0,a.y0); const s=sn||(g&&g.pt)||[a.x0,a.y0]; a.stroke.p.push(s[0],s[1],.5,s[0],s[1],.5); a.s0=s; a.s0Snap=g; a.startSnapped=!!sn; a.lenMm=0; a.deg=0; if(S.lnLen!==null) lineMove(a,a.x0+1,a.y0); drawLiveSoon(); }
+function lineStart(a){ a.mode="line"; a.mg={}; a.endSnap=null; a.stroke={t:"p",c:S.penColor,w:PEN_W[S.penW],p:[]}; const sn=snapPt(a.pg,a.x0,a.y0), g=sn?null:snapStart(a.pg,a.x0,a.y0); const s=sn||(g&&g.pt)||[a.x0,a.y0]; a.stroke.p.push(a.x0,a.y0,.5,a.x0,a.y0,.5); a.s0=s; a.s0Snap=null; a.baseStartSnap=g; a.startSnapped=!!sn; a.lenMm=0; a.deg=0; if(S.lnLen!==null) lineMove(a,a.x0+1,a.y0); drawLiveSoon(); }
 function lineMove(a,x,y){
-  const pg=a.pg, U=mmU(pg), p=a.stroke.p; p[0]=a.s0[0]; p[1]=a.s0[1]; delete a.stroke._bb; delete a.stroke._e;
+  const pg=a.pg, U=mmU(pg), p=a.stroke.p;
+  // v31: in the line/ruler tool, short strokes follow the pointer without
+  // endpoint snapping, direction snapping or rounding to grid/millimetres.
+  // A manually entered fixed angle/length still keeps its explicit values.
+  const rawLen=Math.hypot(x-a.x0,y-a.y0);
+  const wantedLen=S.lnLen!==null?S.lnLen*10*U:rawLen;
+  if(wantedLen<=twoCellLineThreshold(pg)){
+    const angle=S.lnAng!==null?-S.lnAng*Math.PI/180:Math.atan2(y-a.y0,x-a.x0);
+    const ex=a.x0+wantedLen*Math.cos(angle),ey=a.y0+wantedLen*Math.sin(angle);
+    p[0]=a.x0;p[1]=a.y0;p[3]=ex;p[4]=ey;
+    a.s0Snap=null;a.endSnap=null;a.mg={};
+    a.lenMm=wantedLen/U;a.deg=((-angle*180/Math.PI)%360+360)%360;
+    delete a.stroke._bb;delete a.stroke._e;
+    return;
+  }
+  p[0]=a.s0[0]; p[1]=a.s0[1]; a.s0Snap=a.baseStartSnap;
+  delete a.stroke._bb; delete a.stroke._e;
   let len=Math.hypot(x-p[0],y-p[1]), ang=Math.atan2(y-p[1],x-p[0]), fixedDir=S.lnAng!==null;
   if(fixedDir) ang=-S.lnAng*Math.PI/180; else { const sn=Math.round(ang/(Math.PI/4))*(Math.PI/4); if(Math.abs(ang-sn)<6*Math.PI/180){ ang=sn; fixedDir=true; } }
   const c=Math.cos(ang), sn=Math.sin(ang); let ex, ey; a.endSnap=null;
@@ -2992,6 +3019,40 @@ function measureMove(a,x,y){ const pt=snapPt(a.pg,x,y)||snapOnLine(a.pg,x,y)||[x
 function measureEnd(){ if(MS){ if(MS.stage==="arm1"){ if(Math.hypot(MS.a[0]-MS.v[0],MS.a[1]-MS.v[1])<8) clearMeasure(); else MS.stage="wait2"; } else if(MS.stage==="arm2") MS.stage="done"; } drawMeasure(); updateHint(); }
 
 /* ---- lasso & selection ---- */
+function autoAreaPath(raw,pg){
+  if(!raw||!(raw.t==="p"||raw.t==="b")) return null;
+  const pts=inkPoints(raw); if(pts.length<7) return null;
+  let minX=pts[0][0],minY=pts[0][1],maxX=pts[0][0],maxY=pts[0][1],len=0;
+  for(let i=1;i<pts.length;i++){
+    const p=pts[i],q=pts[i-1];
+    minX=Math.min(minX,p[0]); minY=Math.min(minY,p[1]); maxX=Math.max(maxX,p[0]); maxY=Math.max(maxY,p[1]);
+    len+=Math.hypot(p[0]-q[0],p[1]-q[1]);
+  }
+  const w=maxX-minX,h=maxY-minY,diag=Math.hypot(w,h);
+  if(w<18||h<18||diag<28||len<diag*1.35) return null;
+  const first=pts[0],last=pts[pts.length-1];
+  const close=Math.hypot(last[0]-first[0],last[1]-first[1]);
+  if(close>Math.max(18,diag*.28)) return null;
+  // Avoid treating tiny loops inside a single handwritten glyph as a selection gesture.
+  const cell=pagePaper(pg)==="mm"?5*MM:axisGridCell(pg);
+  if(w<cell*.7&&h<cell*.7) return null;
+  const poly=[];
+  for(let i=0;i<pts.length;i++) poly.push(pts[i][0],pts[i][1]);
+  return poly;
+}
+function tryAutoAreaSelect(pg,raw,gestureItem){
+  if(!pg||!raw||!gestureItem) return false;
+  const poly=autoAreaPath(raw,pg); if(!poly) return false;
+  const items=pg.strokes.filter(it=>it!==gestureItem&&insideLasso(it,poly));
+  if(!items.length) return false;
+  setSel(pg,items);
+  return true;
+}
+function pointInSelBox(pg,x,y){
+  if(!S.sel||S.sel.pg!==pg||!S.sel.items||!S.sel.items.length) return false;
+  const b=selBBox();
+  return x>=b[0]-16&&x<=b[2]+16&&y>=b[1]-16&&y<=b[3]+16;
+}
 function selBBox(){ let b=[1e9,1e9,-1e9,-1e9]; for(const it of S.sel.items){ const q=bbox(it), m=(it.w||0)/2; b=[Math.min(b[0],q[0]-m),Math.min(b[1],q[1]-m),Math.max(b[2],q[2]+m),Math.max(b[3],q[3]+m)]; } return b; }
 function drawSelBox(ctx,pg,b){ const k=uiK(pg); ctx.save(); ctx.strokeStyle=ACC; ctx.lineWidth=1.5/k; ctx.setLineDash([6/k,4/k]); ctx.strokeRect(b[0]-6,b[1]-6,b[2]-b[0]+12,b[3]-b[1]+12); ctx.setLineDash([]); ctx.fillStyle="#fff"; ctx.lineWidth=2.2/k; ctx.beginPath(); ctx.arc(b[2]+6,b[3]+6,9/k,0,6.283); ctx.fill(); ctx.stroke(); ctx.restore(); }
 let selMenu=null;
