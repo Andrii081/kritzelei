@@ -169,6 +169,12 @@ button{touch-action:manipulation;cursor:pointer}
 .selmenu{position:absolute;z-index:4;display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:360px;background:var(--raise);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 28px -10px var(--paper-shadow);cursor:default;-webkit-user-select:none;user-select:none}
 .selmenu .sw{width:26px;height:26px}.selmenu .sw i{width:17px;height:17px}
 .selmenu .btn{padding:5px 8px;font-size:13px}
+.ctxmenu{position:fixed;z-index:50;display:flex;flex-direction:column;min-width:190px;background:var(--raise);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:5px;box-shadow:0 14px 36px -8px rgba(0,0,0,.45);-webkit-user-select:none;user-select:none}
+.ctxmenu button{border:0;background:transparent;color:inherit;text-align:left;font-size:17px;padding:11px 14px;border-radius:8px;touch-action:manipulation}
+.ctxmenu button:active{background:var(--line)}
+.ctxmenu button[disabled]{opacity:.38}
+.ctxmenu button.danger{color:#c62828}
+.ctxmenu hr{border:0;border-top:1px solid var(--line);margin:3px 6px}
 .textedit{position:absolute;z-index:3;margin:0;padding:0;border:0;outline:1.5px dashed var(--accent);outline-offset:3px;background:rgba(255,255,255,.55);resize:none;overflow:hidden;line-height:1.3;font-family:var(--f-ui);transform-origin:0 0;min-height:1em;-webkit-user-select:text;user-select:text}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--desk);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
 #toast.on{opacity:1}
@@ -420,7 +426,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v33";
+const APP_VER="v35";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -603,6 +609,7 @@ function bbox(it){
       b=[Math.min(b[0]-34,x-42),Math.min(b[1]-34,y-42),Math.max(b[2]+34,x+65),Math.max(b[3]+34,y+44)];
       if(it.axisName==="x") {b[1]-=26;b[3]+=24;}
       if(it.axisName==="y") {b[0]-=45;b[2]+=24;}
+      if(it.axisMarks||it.axisLabel){b[0]-=60;b[2]+=90;b[1]-=20;b[3]+=20;}
     }
   }
   return (it._bb=b);
@@ -755,6 +762,14 @@ function strokePaths(s){
 /* v25 axis scale. The numbered ticks are part of each X/Y/Z axis item, so they
    serialize, erase, export and undo together rather than drifting as text nodes. */
 const AXIS_FONT='600 14px "Rubik",system-ui,sans-serif';
+const AXT_ALL={
+  ru:{nums:"Цифры на осях",numsHint:"Без галочки цифр нет: нажмите возле деления и впишите подпись только для него.",name:"Подпись оси",nameHint:"Любая буква или текст вместо X / Y / Z.",mark:"Подпись у деления",markHint:"Пустое поле убирает подпись.",cancel:"Отмена",ok:"Применить"},
+  uk:{nums:"Цифри на осях",numsHint:"Без галочки цифр немає: натисніть біля поділки й впишіть підпис лише для неї.",name:"Підпис осі",nameHint:"Будь-яка літера чи текст замість X / Y / Z.",mark:"Підпис біля поділки",markHint:"Порожнє поле прибирає підпис.",cancel:"Скасувати",ok:"Застосувати"},
+  de:{nums:"Zahlen an Achsen",numsHint:"Ohne Haken keine Zahlen: neben einen Teilstrich tippen und nur dort eine Beschriftung eintragen.",name:"Achsenbeschriftung",nameHint:"Beliebiger Buchstabe oder Text statt X / Y / Z.",mark:"Beschriftung am Teilstrich",markHint:"Leeres Feld entfernt die Beschriftung.",cancel:"Abbrechen",ok:"Übernehmen"},
+  en:{nums:"Numbers on axes",numsHint:"Unticked: no numbers - tap next to a tick and type a label just for it.",name:"Axis label",nameHint:"Any letter or text instead of X / Y / Z.",mark:"Label at tick",markHint:"An empty field removes the label.",cancel:"Cancel",ok:"Apply"}
+};
+const AXT=(k)=>(AXT_ALL[LANG]||AXT_ALL.en)[k];
+const axisNumsOn=()=>S.axisNums!==false;
 function axisGridCell(pg){
   const paper=pagePaper(pg);
   if(paper==="mm")return MM; // millimetre graph paper: one tiny square
@@ -795,7 +810,8 @@ function axisTicks(it,fn){
     const y=a.kind==="y"?a.o+i*a.unit:a.kind==="z"?a.origin[1]+a.uy*i*a.unit:a.origin[1];
     const val=Number((n*a.step).toPrecision(12));
     const label=String(val).replace(".",DEC_COMMA.has(LANG)?",":".");
-    fn({x,y,n,value:val,label,kind:a.kind,unit:a.unit,ux:a.ux,uy:a.uy});
+    const mark=it.axisMarks&&it.axisMarks[i];
+    fn({x,y,n,i,value:val,label:axisNumsOn()?label:(mark||""),kind:a.kind,unit:a.unit,ux:a.ux,uy:a.uy});
   }
 }
 function drawAxisScale(ctx,s){
@@ -807,7 +823,7 @@ function drawAxisScale(ctx,s){
     ctx.beginPath();
     if(t.kind==="x"){
       ctx.moveTo(t.x,t.y-5);ctx.lineTo(t.x,t.y+5);ctx.stroke();
-      if(t.label.length>2){
+      if(t.label.length>2&&axisNumsOn()){
         ctx.save();ctx.translate(t.x,t.y+11);ctx.rotate(-Math.PI/3);
         ctx.textAlign="right";ctx.font='600 13px "Rubik",system-ui,sans-serif';
         ctx.fillText(t.label,-1,1);ctx.restore();
@@ -824,7 +840,7 @@ function drawAxisScale(ctx,s){
       ctx.fillText(t.label,t.x+nx*offset,t.y+ny*offset);
     }
   });
-  if(s.axisName==="x"){
+  if(s.axisName==="x"&&axisNumsOn()){
     ctx.textAlign="right";ctx.font='500 12px "Rubik",sans-serif';
     ctx.fillText("0",a.origin[0]-7,a.origin[1]+14);
   }
@@ -843,7 +859,7 @@ function drawStroke(ctx,s){
       arrowHead(ctx,p[0],p[1],p[3],p[4],Math.min(18,L*.18),Math.min(7,L*.065));
       ctx.font='italic 25px "Pacifico", "Caveat", cursive';
       ctx.textBaseline="middle";
-      ctx.fillText(s.axisName,p[3]+(dx/L)*15+4,p[4]+(dy/L)*15-4);
+      ctx.fillText(s.axisLabel||s.axisName,p[3]+(dx/L)*15+4,p[4]+(dy/L)*15-4);
     }
   }
   if(["x","y","z"].includes(s.axisName))drawAxisScale(ctx,s);
@@ -1142,7 +1158,7 @@ Object.assign(I18N.uk,{calligHint:"Покращення окремих руко�
 Object.assign(I18N.en,{calligHint:"Beautify individual handwritten letters and digits, while keeping uncertain strokes. Recognized characters can be erased with the normal eraser."});
 Object.assign(I18N.de,{calligHint:"Einzelne handgeschriebene Buchstaben und Ziffern glätten. Unsichere Zeichen bleiben im Original. Die normale Radierfunktion entfernt auch erkannte Zeichen."});
 const S={calcPos:null,calcDeg:true,pick:null,snap:true,scanMode:"color",nb:null,pages:[],tool:"pen",penColor:PEN_COLORS[0],hlColor:HL_COLORS[0],penW:1,hlW:1,finger:false,penType:"pen",autoShape:true,smartInk:true,scratchErase:true,calligInk:false,custom:[],erMode:"whole",erSize:1,txtSize:1,shape:"circle",zoom:1,folder:"",query:"",undo:[],redo:[],lnLen:null,lnAng:null,fix:{dia:null,bw:null,bh:null},sel:null,clip:null,arc:null,baseW:880};
-const PREF_KEYS=["penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","scratchErase","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
+const PREF_KEYS=["axisNums","penColor","hlColor","penW","hlW","finger","penType","autoShape","smartInk","scratchErase","custom","erMode","erSize","txtSize","shape","scanMode","snap","calcPos","calcDeg"];
 try{ const pref=JSON.parse(localStorage.getItem("kritzelei.prefs")||"{}"); for(const k of PREF_KEYS) if(pref[k]!==undefined) S[k]=pref[k]; }catch(e){}
 function savePrefs(){ try{ const o={}; for(const k of PREF_KEYS) o[k]=S[k]; localStorage.setItem("kritzelei.prefs",JSON.stringify(o)); }catch(e){} }
 loadClip();
@@ -1584,6 +1600,9 @@ function renderOptsInner(o){
     scratch.checked=!!S.scratchErase;
     scratch.onchange=()=>{S.scratchErase=scratch.checked;savePrefs();renderOpts();};
     o.append(h("label",{class:"tog smart-mode",title:tt("scratchEraseHint")},scratch,tt("scratchErase")));
+    const an=h("input",{type:"checkbox",id:"axisNumsTog","aria-label":AXT("nums")}); an.checked=axisNumsOn();
+    an.onchange=()=>{ S.axisNums=an.checked; savePrefs(); for(const pg of S.pages) if(pg.ctx) redraw(pg); toast(an.checked?AXT("nums"):AXT("numsHint")); };
+    o.append(h("label",{class:"tog smart-mode",title:AXT("numsHint")},an,AXT("nums")));
     // Existing hold-to-straighten option remains unchanged when smart mode is off.
     if(!S.smartInk){ const cb=h("input",{type:"checkbox",id:"autoShape"}); cb.checked=!!S.autoShape; cb.onchange=()=>{ S.autoShape=cb.checked; savePrefs(); renderOpts(); }; o.append(h("label",{class:"tog"},cb,tt("straighten"))); }
   }
@@ -2482,6 +2501,38 @@ function smartInkEnd(a){
   return remember(s,true);
 }
 
+/* v35: tap the axis letter to rename it; with numbers off, tap next to a tick to give just that tick a caption */
+function axisNameTarget(pg,x,y){
+  for(let k=pg.strokes.length-1;k>=0;k--){ const it=pg.strokes[k]; if(!["x","y","z"].includes(it.axisName)||!it.p||it.p.length!==6) continue;
+    const p=it.p, dx=p[3]-p[0], dy=p[4]-p[1], L=Math.hypot(dx,dy); if(L<=25) continue;
+    const lx=p[3]+(dx/L)*15+4, ly=p[4]+(dy/L)*15-4, w=Math.max(18,String(it.axisLabel||it.axisName).length*15);
+    if(x>=lx-10&&x<=lx+w+8&&y>=ly-20&&y<=ly+20) return it; }
+  return null;
+}
+function axisTickTarget(pg,x,y){
+  let best=null, md=16;
+  for(const it of pg.strokes){ if(!axisGeometry(it)) continue;
+    axisTicks(it,t=>{ const tx=t.kind==="x"?t.x:t.kind==="z"?t.x-t.uy*13:t.x-16, ty=t.kind==="x"?t.y+16:t.kind==="z"?t.y+t.ux*13:t.y;
+      const w=Math.max(14,t.label.length*8), d=Math.hypot(Math.max(0,Math.abs(x-tx)-w/2),Math.max(0,Math.abs(y-ty)-10)); if(d<md){ md=d; best={it,t}; } }); }
+  return best;
+}
+function axisTextDialog(title,hint,value,onOk){
+  const old=document.getElementById("axisStepDialog"); if(old) old.remove();
+  const outer=h("div",{id:"axisStepDialog",class:"axis-step-overlay",role:"dialog","aria-modal":"true"}), panel=h("div",{class:"axis-step-panel"});
+  const field=h("input",{type:"text",id:"axisTextValue",maxlength:"40",autocomplete:"off"}); field.value=value||"";
+  const close=()=>outer.remove(), apply=()=>{ const v=field.value.trim(); close(); onOk(v); };
+  field.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); apply(); } else if(e.key==="Escape") close(); });
+  outer.addEventListener("pointerdown",e=>{ if(e.target===outer) close(); });
+  panel.append(h("h3",null,title),h("p",null,hint),field,h("div",{class:"axis-step-actions"},h("button",{class:"btn",type:"button",onclick:close},AXT("cancel")),h("button",{class:"btn primary",type:"button",onclick:apply},AXT("ok"))));
+  outer.append(panel); document.body.append(outer); setTimeout(()=>{ field.focus(); field.select(); },50);
+}
+function axisChange(pg,it,fn){ const i=pg.strokes.indexOf(it); if(i<0) return; const before=pg.strokes.slice(), n=cloneItem(it); fn(n); pg.strokes[i]=n; redraw(pg); commitPage(pg,before); }
+function axisTapOpen(a){
+  const pg=a.pg;
+  if(a.axisNameIt){ const it=a.axisNameIt; axisTextDialog(AXT("name"),AXT("nameHint"),it.axisLabel||it.axisName,v=>axisChange(pg,it,n=>{ if(v&&v!==n.axisName) n.axisLabel=v; else delete n.axisLabel; })); return; }
+  if(a.axisTick){ const {it,t}=a.axisTick, cur=(it.axisMarks&&it.axisMarks[t.i])||"";
+    axisTextDialog(AXT("mark"),AXT("markHint"),cur,v=>axisChange(pg,it,n=>{ const m=Object.assign({},n.axisMarks||{}); if(v) m[t.i]=v; else delete m[t.i]; if(Object.keys(m).length) n.axisMarks=m; else delete n.axisMarks; })); }
+}
 /* v25 long press any X/Y/Z tick number to edit the entire coordinate scale. */
 function axisLabelTarget(pg,x,y){
   let best=null,minDist=18;
@@ -2541,6 +2592,41 @@ function tolU(a){ return 11/(a.rect.width/W); }
 function hitShape(pg,x,y,r){ for(let i=pg.strokes.length-1;i>=0;i--){ const it=pg.strokes[i]; if((isLine(it)||"orgadq".indexOf(it.t)>=0)&&hitItem(it,x,y,r)) return it; } return null; }
 function hitAny(pg,x,y,r,types){ for(let i=pg.strokes.length-1;i>=0;i--){ const it=pg.strokes[i]; if(types&&types.indexOf(it.t)<0) continue; if(hitItem(it,x,y,r)) return it; } return null; }
 function drawLiveSoon(){ if(!liveRaf) liveRaf=requestAnimationFrame(()=>{ liveRaf=0; drawLive(); }); }
+/* ---- long press: menu at that spot (finger ~0.6 s, stylus 2 s, held still) ---- */
+let LP=null, ctxEl=null;
+function lpArm(e,pg,x,y,a){ lpCancel(); const pen=e.pointerType==="pen"||(e.pointerType==="touch"&&S.finger), ms=e.pointerType==="mouse"?700:(pen?2000:600);
+  LP={id:e.pointerId,pg,x,y,cx:e.clientX,cy:e.clientY,a,tol:e.pointerType==="pen"?7:12,rw:pg.el.getBoundingClientRect().width}; LP.t=setTimeout(lpFire,ms); }
+function lpCancel(){ if(LP){ clearTimeout(LP.t); LP=null; } }
+pagesEl.addEventListener("pointermove",(e)=>{ if(LP&&e.pointerId===LP.id&&Math.hypot(e.clientX-LP.cx,e.clientY-LP.cy)>LP.tol) lpCancel(); });
+for(const ev of ["pointerup","pointercancel"]) pagesEl.addEventListener(ev,(e)=>{ if(LP&&e.pointerId===LP.id) lpCancel(); });
+// the menu closes when the sheet is really scrolled (finger scrolling already cancels a long press by itself)
+scroller.addEventListener("scroll",()=>{ if(ctxEl&&Math.abs(scroller.scrollTop-ctxEl._st)+Math.abs(scroller.scrollLeft-ctxEl._sl)>24) closeCtx(); },{passive:true});
+function lpFire(){
+  const L=LP; LP=null; if(!L||pinch) return; const a=L.a;
+  if(a&&act===a){
+    if(["grab","erase","measure","axisHold","axisTap","arc2","regionPt"].includes(a.mode)) return; // these keep their own meaning
+    act=null; if(liveRaf){ cancelAnimationFrame(liveRaf); liveRaf=0; } clearOverlay("live"); clearTimeout(a.timer); clearTimeout(a.holdT);
+    if(a.mode==="selMove"||a.mode==="selScale"){ a.dx=0; a.dy=0; a.s=1; a.mode="selMove"; selTransformEnd(a); }
+    try{ a.el.releasePointerCapture(a.id); }catch(_){}
+  }
+  vibrate(); openCtx(L.pg,L.x,L.y,L.cx,L.cy,L.rw);
+}
+function closeCtx(){ if(ctxEl){ ctxEl.remove(); ctxEl=null; if(S.sel) showSelection(); } }
+function openCtx(pg,x,y,cx,cy,rw){
+  closeCtx(); ensureCanvas(pg);
+  let sel=!!(S.sel&&S.sel.pg===pg&&pointInSelBox(pg,x,y));
+  if(!sel){ const it=hitAny(pg,x,y,11/(rw/W)); if(it){ setSel(pg,[it]); sel=true; } else clearSel(); }
+  if(selMenu) selMenu.remove();
+  const m=h("div",{class:"ctxmenu",role:"menu"}), add=(t,fn,cls,dis)=>{ const b=h("button",{type:"button",role:"menuitem",class:cls||null},t); if(dis) b.disabled=true; b.onclick=async()=>{ m.remove(); ctxEl=null; await fn(); }; m.append(b); };
+  add(tt("paste"),()=>pasteClip({pg,x,y}),null,!S.clip);
+  if(sel){ m.append(h("hr")); add(tt("copy"),withRegion(()=>selCopy())); add(tt("cut"),withRegion(()=>{ selCopy(true); selDelete(); })); add(tt("duplicate"),withRegion(selDuplicate)); add(tt("del"),withRegion(selDelete),"danger"); }
+  else if(pg.strokes.length){ m.append(h("hr")); add(tt("selectPage"),()=>setSel(pg,pg.strokes.slice())); }
+  document.body.append(m); ctxEl=m; m._st=scroller.scrollTop; m._sl=scroller.scrollLeft;
+  const r=m.getBoundingClientRect(); let L=cx+12, T=cy-r.height/2;
+  if(L+r.width>innerWidth-8) L=cx-12-r.width; m.style.left=Math.max(8,L)+"px"; m.style.top=clamp(T,8,Math.max(8,innerHeight-r.height-8))+"px";
+}
+// a tap anywhere outside closes the menu
+document.addEventListener("pointerdown",(e)=>{ if(ctxEl&&!ctxEl.contains(e.target)){ const el=ctxEl; ctxEl=null; el.remove(); if(S.sel&&!(e.target.closest&&e.target.closest(".page"))) showSelection(); } },true);
 function abortAct(){
   const a=act; act=null; if(!a) return; if(liveRaf){ cancelAnimationFrame(liveRaf); liveRaf=0; } clearOverlay("live"); clearTimeout(a.timer); clearTimeout(a.holdT);
   if(a.mode==="grab"&&a.before){ a.pg.hidden=null; a.pg.strokes=a.before; hideItemSel(); redraw(a.pg); }
@@ -2557,7 +2643,12 @@ pagesEl.addEventListener("pointerdown",(e)=>{
   const a={id:e.pointerId,pg,el,rect,x0:x,y0:y,cx:e.clientX,cy:e.clientY,touch:e.pointerType==="touch",fingerNav,pen:e.pointerType==="pen"};
   // A long-press on a drawn axis number edits the step, independent of tool.
   if(S.tool!=="er"&&S.tool!=="lasso"&&S.tool!=="text"){
-    const target=axisLabelTarget(pg,x,y);
+    const nameIt=axisNameTarget(pg,x,y), tick=nameIt||axisNumsOn()?null:axisTickTarget(pg,x,y);
+    if(nameIt||tick){ // a tap opens the caption field; moving the pen instead goes on drawing as usual
+      e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(_){}
+      a.mode="axisTap"; a.axisNameIt=nameIt; a.axisTick=tick; act=a; return;
+    }
+    const target=axisNumsOn()?axisLabelTarget(pg,x,y):null;
     if(target){
       e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(_){}
       a.mode="axisHold";a.axisSource=target.it;
@@ -2565,10 +2656,15 @@ pagesEl.addEventListener("pointerdown",(e)=>{
       act=a;return;
     }
   }
+  closeCtx();
+  if(S.tool!=="an") lpArm(e,pg,x,y,a);
+  const hv=regionHandleAt(pg,x,y,rect.width);
+  if(hv>=0){ e.preventDefault(); try{ el.setPointerCapture(e.pointerId); }catch(_){} ensureCanvas(pg); a.mode="regionPt"; a.vi=hv; if(selMenu) selMenu.remove(); act=a; return; }
   if(S.sel&&S.tool==="pen"&&S.sel.pg===pg&&!pointInSelBox(pg,x,y)){
     clearSel();
     return;
   }
+  if(S.sel&&S.tool!=="lasso"&&S.sel.pg===pg&&!fingerNav&&pointInSelBox(pg,x,y)){ e.preventDefault(); try{ el.setPointerCapture(e.pointerId); }catch(_){} ensureCanvas(pg); act=a; lassoStart(a); return; }
   if(textEd){ finishText(); if(S.tool==="text"||fingerNav) return; }
   if(pop) closePop();
   const arcWaiting=S.tool==="shape"&&S.arc&&S.arc.stage==="wait2";
@@ -2601,7 +2697,7 @@ pagesEl.addEventListener("pointermove",(e)=>{
   const a=act; if(!a||e.pointerId!==a.id) return;
   const [x,y]=localPt(e,a.rect,a.pg);
   switch(a.mode){
-    case "axisHold":if(Math.hypot(e.clientX-a.cx,e.clientY-a.cy)>12){
+    case "axisTap": case "axisHold":if(Math.hypot(e.clientX-a.cx,e.clientY-a.cy)>12){
       // A number label is also a valid starting point for drawing Z. A drag
       // cancels the hold but MUST continue as ink; v24 silently lost this stroke.
       clearTimeout(a.holdT);
@@ -2626,6 +2722,7 @@ function moveTool(a,e,x,y){
     case "selMove": a.dx=x-a.x0; a.dy=y-a.y0; drawLiveSoon(); return;
     case "selScale": { const bb=a.bb, hx=bb[2]-bb[0], hy=bb[3]-bb[1], L=hx*hx+hy*hy||1; a.s=clamp(((x-bb[0])*hx+(y-bb[1])*hy)/L,.05,20); drawLiveSoon(); return; }
     case "grab": grabMove(a,x,y); return;
+    case "regionPt": { const R=S.sel&&S.sel.region; if(!R) return; R.poly[2*a.vi]=clamp(x,0,W); R.poly[2*a.vi+1]=clamp(y,0,pageH(a.pg)); regionBB(R,a.pg); if(!liveRaf) liveRaf=requestAnimationFrame(()=>{ liveRaf=0; showSelection(); }); return; }
   }
 }
 function endPointer(e){
@@ -2634,8 +2731,10 @@ function endPointer(e){
   const up=e.type==="pointerup";
   switch(a.mode){
     case "axisHold": return; // quick tap does nothing; hold triggers the scale editor
+    case "axisTap": if(up) axisTapOpen(a); return;
     case "cand": clearTimeout(a.timer); if(up&&!dimTap(a)) openPop(a.pg,a.item,e.clientX,e.clientY); return;
     case "grab": grabEnd(a); return;
+    case "regionPt": regionChanged(); return;
     case "stroke": {
       // Some iPad Pencil gestures deliver only pointerdown + pointerup. Capture the
       // release position so even the quickest single-stroke line has two points.
@@ -3035,7 +3134,7 @@ function autoAreaPath(raw,pg){
   if(w<18||h<18||diag<28||len<diag*1.35) return null;
   const first=pts[0],last=pts[pts.length-1];
   const close=Math.hypot(last[0]-first[0],last[1]-first[1]);
-  if(close>Math.max(18,diag*.28)) return null;
+  if(close>Math.max(18,diag*(pg&&pg.bg?.4:.28))) return null; // on a PDF the loop may stay a little open
   // Avoid treating tiny loops inside a single handwritten glyph as a selection gesture.
   const cell=pagePaper(pg)==="mm"?5*MM:axisGridCell(pg);
   if(w<cell*.7&&h<cell*.7) return null;
@@ -3046,9 +3145,9 @@ function autoAreaPath(raw,pg){
 function tryAutoAreaSelect(pg,raw,gestureItem){
   if(!pg||!raw||!gestureItem) return false;
   const poly=autoAreaPath(raw,pg); if(!poly) return false;
-  const items=pg.strokes.filter(it=>it!==gestureItem&&insideLasso(it,poly));
-  if(!items.length) return false;
-  setSel(pg,items);
+  const items=pg.strokes.filter(it=>it!==gestureItem&&insideLasso(it,poly)), region=pg.bg?regionOf(pg,poly):null;
+  if(!items.length&&!region) return false;
+  setSel(pg,items,region);
   if(S.sel) S.sel.loop=gestureItem; // the drawn loop itself: removed as soon as the selection is used
   return true;
 }
@@ -3069,7 +3168,27 @@ function regionOf(pg,poly){
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(let i=0;i<poly.length;i+=2){ x0=Math.min(x0,poly[i]); x1=Math.max(x1,poly[i]); y0=Math.min(y0,poly[i+1]); y1=Math.max(y1,poly[i+1]); }
   x0=Math.max(0,x0); y0=Math.max(0,y0); x1=Math.min(W,x1); y1=Math.min(pageH(pg),y1);
   if(x1-x0<12||y1-y0<12) return null;
-  return {poly:poly.slice(),bb:[x0,y0,x1,y1],piece:null,cover:null,lifted:false};
+  const R={poly:resamplePoly(poly,12),bb:null,piece:null,cover:null,lifted:false}; regionBB(R,pg); return R;
+}
+// n points spread evenly along the loop - these are the handles of the area
+function resamplePoly(poly,n){
+  const P=[]; for(let i=0;i<poly.length;i+=2) P.push([poly[i],poly[i+1]]); P.push(P[0]);
+  let L=0; const seg=[]; for(let i=1;i<P.length;i++){ const d=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]); seg.push(d); L+=d; }
+  if(L<=0) return poly.slice(0,2*n);
+  const out=[]; let j=0, acc=0;
+  for(let k=0;k<n;k++){ const t=L*k/n; while(j<seg.length-1&&acc+seg[j]<t){ acc+=seg[j]; j++; } const f=seg[j]?(t-acc)/seg[j]:0; out.push(P[j][0]+(P[j+1][0]-P[j][0])*f,P[j][1]+(P[j+1][1]-P[j][1])*f); }
+  return out;
+}
+function regionBB(R,pg){ const p=R.poly; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(let i=0;i<p.length;i+=2){ x0=Math.min(x0,p[i]); x1=Math.max(x1,p[i]); y0=Math.min(y0,p[i+1]); y1=Math.max(y1,p[i+1]); } R.bb=[Math.max(0,x0),Math.max(0,y0),Math.min(W,x1),Math.min(pageH(pg),y1)]; }
+// after a point was dragged: the piece is cut again along the new outline
+function regionChanged(){ const q=S.sel, R=q&&q.region; if(!R) return; regionBB(R,q.pg); dropRegion(q); q.pdf=R; R.piece=null; R.cover=null; R.ready=prepRegion(q); showSelection(); }
+function regionHandleAt(pg,x,y,rectW){ const q=S.sel, R=q&&q.region; if(!R||q.pg!==pg||R.lifted) return -1; const r=22/(rectW/W); let best=-1, bd=r; for(let i=0;i<R.poly.length;i+=2){ const d=Math.hypot(R.poly[i]-x,R.poly[i+1]-y); if(d<bd){ bd=d; best=i/2; } } return best; }
+function drawRegionSel(ctx,pg,R,withBox){
+  const k=uiK(pg), p=R.poly; ctx.save();
+  ctx.beginPath(); ctx.moveTo(p[0],p[1]); for(let i=2;i<p.length;i+=2) ctx.lineTo(p[i],p[i+1]); ctx.closePath();
+  ctx.fillStyle="rgba(39,71,196,.07)"; ctx.fill(); ctx.strokeStyle=ACC; ctx.lineWidth=1.6/k; ctx.setLineDash([7/k,5/k]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle="#fff"; ctx.lineWidth=2.4/k; for(let i=0;i<p.length;i+=2){ ctx.beginPath(); ctx.arc(p[i],p[i+1],7/k,0,6.283); ctx.fill(); ctx.stroke(); }
+  ctx.restore();
 }
 async function prepRegion(sel){ // the piece = background inside the loop; the cover = white patch that hides it on the page
   const R=sel.region, pg=sel.pg, rec=imgRec(pg.bg); try{ await rec.p; }catch(e){} if(!rec.ok) return;
@@ -3099,7 +3218,8 @@ function dropSelLoop(){ const q=S.sel; if(!q||!q.loop) return false; const lp=q.
 function clearSel(){ if(S.sel){ dropRegion(S.sel); S.sel=null; } clearOverlay("sel"); if(selMenu) selMenu.remove(); }
 function showSelection(){
   if(!S.sel){ clearSel(); return; }
-  const {pg}=S.sel; const ctx=overlay("sel",pg); if(!ctx) return; const b=selBBox(); drawSelBox(ctx,pg,b);
+  const {pg}=S.sel; const ctx=overlay("sel",pg); if(!ctx) return; const b=selBBox(), R=S.sel.region&&!S.sel.region.lifted?S.sel.region:null;
+  if(R&&!S.sel.items.length) drawRegionSel(ctx,pg,R,false); else { drawSelBox(ctx,pg,b); if(R) drawRegionSel(ctx,pg,R,true); }
   if(!selMenu) selMenu=h("div",{class:"selmenu",role:"toolbar","aria-label":tt("selection")});
   selMenu.innerHTML="";
   const items=S.sel.items, single=items.length===1&&!S.sel.region?items[0]:null;
@@ -3154,16 +3274,17 @@ function selDelete(){ if(!S.sel) return; const pg=S.sel.pg, before=pg.strokes.sl
 function selDuplicate(){ if(!S.sel) return; const {pg}=S.sel, R=S.sel.region, items=S.sel.items.concat(R&&!R.lifted&&R.piece?[R.piece]:[]); if(!items.length) return; const before=pg.strokes.slice(); dropSelLoop(); const ni=items.map(it=>mapItem(it,1,0,0,20,20)); pg.strokes.push(...ni); redraw(pg); commitPage(pg,before); setSel(pg,ni); }
 // the part of the sheet that is on screen, in sheet units
 function visRect(pg){ const er=pg.el.getBoundingClientRect(), sr=scroller.getBoundingClientRect(), k=er.width/W||1; const x0=(Math.max(er.left,sr.left)-er.left)/k, x1=(Math.min(er.right,sr.right)-er.left)/k, y0=(Math.max(er.top,sr.top)-er.top)/k, y1=(Math.min(er.bottom,sr.bottom)-er.top)/k; return [x0,y0,Math.max(x0,x1),Math.max(y0,y1)]; }
-function pasteClip(){
-  if(!S.clip) return; const pg=(S.sel&&S.sel.pg)||currentPage(); if(!pg||!pg.el) return; ensureCanvas(pg);
+function pasteClip(at){
+  if(!S.clip) return; const pg=at&&at.pg||(S.sel&&S.sel.pg)||currentPage(); if(!pg||!pg.el) return; ensureCanvas(pg);
   const c=S.clip; c.n=(c.n||0)+1;
   const bb=unionBB(c.items), v=visRect(pg), ph=pageH(pg), grows=growsAuto(pg)||(!!pg.noteGrow&&!pg.bg);
   // Same sheet and the original is on screen: a small step beside it, as before.
   // Otherwise (another sheet, another notebook, or scrolled away): the middle of what is on screen.
-  const beside=c.pid===pg.id&&bb[2]>v[0]&&bb[0]<v[2]&&bb[3]>v[1]&&bb[1]<v[3];
+  const beside=!at&&c.pid===pg.id&&bb[2]>v[0]&&bb[0]<v[2]&&bb[3]>v[1]&&bb[1]<v[3];
   let k=1; if(!beside){ k=Math.min(1,(W-16)/Math.max(1,bb[2]-bb[0])); if(!grows) k=Math.min(k,(ph-16)/Math.max(1,bb[3]-bb[1])); } // too big for the sheet: make it fit
   const bw=(bb[2]-bb[0])*k, bh=(bb[3]-bb[1])*k, st=beside?20*c.n:14*((c.n-1)%8);
   let x=beside?bb[0]+st:(v[0]+v[2])/2-bw/2+st, y=beside?bb[1]+st:(v[1]+v[3])/2-bh/2+st;
+  if(at){ x=at.x-bw/2; y=at.y-bh/2; } // long press: exactly where the finger / pen was
   x=Math.max(8,Math.min(x,W-8-bw)); y=Math.max(8,grows?y:Math.min(y,ph-8-bh)); // stay on the sheet
   const before=pg.strokes.slice(); const ni=c.items.map(it=>mapItem(it,k,bb[0],bb[1],x-bb[0],y-bb[1]));
   pg.strokes.push(...ni); redraw(pg); commitPage(pg,before); if(S.tool!=="lasso"){ S.tool="lasso"; renderTools(); } setSel(pg,ni);

@@ -1,4 +1,4 @@
-# Kritzelei v33 — Doodles / Каракули / Kritzelei
+# Kritzelei v35 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -169,3 +169,16 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - **Copy** puts the piece on the clipboard; paste it anywhere, also in another notebook. White paper becomes see-through, so on a squared page only the content shows.
 - **Cut**, **Delete** or dragging the selection lifts the piece off the page and leaves white paper behind. **Duplicate** makes a copy beside it. One Undo restores the page.
 - If the loop also contains your own handwriting, only the handwriting is selected (so moving notes never damages the PDF). Tap **+ PDF** in the selection menu to take the printed content under it as well.
+
+
+## v34 — long-press menu, pen loop on PDF, adjustable area
+- **Long press** anywhere on the sheet opens a menu right there: a finger held still about 0.6 s, the stylus held still 2 s. On an empty spot: **Paste** (exactly at that spot) and **Select page**. On ink, a picture or a selection: **Copy, Cut, Duplicate, Delete** and Paste.
+- A loop drawn with the **pen** on a PDF or scanned page now selects that piece of the PDF as well (the Lasso still works too). If you just tap elsewhere, the circle stays as your drawing.
+- The selected PDF area shows **12 points on its outline**. Drag any point to shape exactly the area you want; the piece is cut again along the new outline.
+- A selection can be dragged with the pen as well, not only with the Lasso.
+
+
+## v35 — your own axis labels
+- **Tap the axis letter** (X, Y or Z) and type any other letter or caption, e.g. `t, s` or `F in N`.
+- New checkbox **Numbers on axes** in the Pen options. Ticked: numbers as before (hold a number to change the step). Unticked: the ticks stay without numbers; **tap next to any tick** and type a caption that appears only at that tick (an empty field removes it).
+- Names and captions are saved with the notebook, in backups and in the PDF export; Undo works.
