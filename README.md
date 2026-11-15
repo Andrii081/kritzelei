@@ -1,4 +1,4 @@
-# Kritzelei v30 — Doodles / Каракули / Kritzelei
+# Kritzelei v33 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -154,3 +154,18 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - The ruler's **Line** tool remains a straight-line tool by design, but its start/end points are not magnetically snapped or angle-rounded while the line is two cells or shorter. Explicit numeric length/angle settings still apply.
 - The threshold follows the current sheet: one tiny mm-grid square is 1 mm; ruled paper uses its line spacing. Existing notes are not rewritten.
 - The purposeful `=` recognizer is unchanged: it can still form a neat mathematical equals sign from two short bars or a compact single-stroke gesture. Coordinate axes, scratch erase, smart selection, PDF and calculators remain.
+
+
+## v32 — selection loop disappears, clipboard between notebooks
+- **Circle to select (pen):** the loop you draw around an area is only a gesture. As soon as you copy, cut, delete, duplicate, recolour or move the selection, the loop is removed from the page too. One Undo brings the content and the loop back together. If you tap somewhere else without doing anything, the circle stays as a normal drawing.
+- **Copy** now also closes the selection.
+- **Clipboard between notebooks:** copy or cut in one notebook, open another notebook or PDF and paste there. The content lands in the middle of what is on screen (not at the old coordinates, where it could end up outside the sheet) and is scaled down if it would not fit on a fixed PDF sheet.
+- **Paste button** is in the Lasso options as before and now also appears in the Pen options while the clipboard holds something.
+- The clipboard survives a reload of the app, and a picture on the clipboard is not deleted together with its notebook.
+
+
+## v33 — copy, cut and move pieces of a PDF page
+- Circle any area of a **PDF or scanned page** with the **Lasso**: printed text, formulas, tables or pictures inside the loop are selected, cut exactly along the loop.
+- **Copy** puts the piece on the clipboard; paste it anywhere, also in another notebook. White paper becomes see-through, so on a squared page only the content shows.
+- **Cut**, **Delete** or dragging the selection lifts the piece off the page and leaves white paper behind. **Duplicate** makes a copy beside it. One Undo restores the page.
+- If the loop also contains your own handwriting, only the handwriting is selected (so moving notes never damages the PDF). Tap **+ PDF** in the selection menu to take the printed content under it as well.
