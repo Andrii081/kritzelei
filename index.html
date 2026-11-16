@@ -428,7 +428,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v36";
+const APP_VER="v37";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -1657,13 +1657,21 @@ function extendNote(pg,bottom){
     scheduleSave();
   }
 }
+// height of a writing page that has other pages after it: just its content + 15 mm (no empty paper before a PDF)
+function compactH(pg){ return Math.max(40*MM,Math.ceil((contentBottom(pg)+15*MM)/(5*MM))*5*MM); }
+function isLastPage(pg){ return S.pages[S.pages.length-1]===pg; }
+function trimBeforeDoc(pg){
+  if(!pg||pg.bg||!(growsAuto(pg)||pg.noteGrow)) return;
+  const h=compactH(pg); if(h<pageH(pg)-.5){ pg.h=h; metaDirty=true; if(pg.el){ pg.el.style.aspectRatio=W+" / "+h; if(pg.cv) updateRegion(pg,true); } scheduleSave(); }
+}
 function autoGrow(pg,shrink){
   if(pg.noteGrow&&!pg.bg){
+    if(shrink&&!isLastPage(pg)&&S.pages[S.pages.indexOf(pg)+1]&&S.pages[S.pages.indexOf(pg)+1].bg){ trimBeforeDoc(pg); return; }
     extendNote(pg,contentBottom(pg));
     return;
   }
   if(!growsAuto(pg)) return;
-  const need=Math.max(A4H,Math.ceil((contentBottom(pg)+GROW_PAD)/GROW_PAD)*GROW_PAD), cur=pageH(pg);
+  const need=isLastPage(pg)?Math.max(A4H,Math.ceil((contentBottom(pg)+GROW_PAD)/GROW_PAD)*GROW_PAD):compactH(pg), cur=pageH(pg);
   if(need>cur+.5||(shrink&&need<cur-.5)){
     pg.h=need; metaDirty=true;
     if(pg.el){ pg.el.style.aspectRatio=W+" / "+need; if(pg.cv) updateRegion(pg,true); }
@@ -3420,7 +3428,7 @@ const BAD_FILE=tt("badFile");
 // empty writing pages at the end stay at the end, and there is always a page to write on after the document.
 function docAt(l){ l=l||S.pages; let at=l.length; while(at>0&&!l[at-1].bg&&!(l[at-1].strokes||[]).length) at--; return at; }
 function withWritingTail(l){ if(!l.length||l[l.length-1].bg) l.push(newNotePage()); return l; }
-function insertPagesHere(made){ const l=S.pages.slice(), cur=currentPage(), at=cur?l.indexOf(cur)+1:docAt(l); l.splice(Math.max(0,at),0,...made); setPlist(withWritingTail(l),true); }
+function insertPagesHere(made){ const l=S.pages.slice(), cur=currentPage(), at=Math.max(0,cur?l.indexOf(cur)+1:docAt(l)); trimBeforeDoc(l[at-1]); l.splice(at,0,...made); setPlist(withWritingTail(l),true); }
 async function importInto(f,kind){ if(kind==="pdf") await importPDF(f,S.nb); else await importGoodnotes(f,S.nb); }
 
 /* ---- QR codes on photos and scans ---- */
@@ -3739,7 +3747,7 @@ $("scanFile").onchange=async (e)=>{
       const ref=await store.putImage(blob);
       const rec={ok:false,img:new Image()}; rec.p=new Promise(res=>{ rec.img.onload=()=>{ rec.ok=true; res(); }; rec.img.onerror=()=>res(); }); rec.img.src=URL.createObjectURL(blob); imgCache.set(ref,rec); await rec.p;
       const pg=Object.assign({id:uid(),strokes:[],bg:ref},land?{h:Math.round(W*210/297),mmw:297}:{});
-      const l=S.pages.slice(); l.splice(Math.min(at,l.length),0,pg); at++; added++; last=pg; setPlist(withWritingTail(l),true);
+      const l=S.pages.slice(), ai=Math.min(at,l.length); trimBeforeDoc(l[ai-1]); l.splice(ai,0,pg); at++; added++; last=pg; setPlist(withWritingTail(l),true);
     }catch(err){ toast(err&&err.code==="quota_or_state"?tt("filesFull"):tt("scanFailed")); }
     src.width=0; src.height=0;
   }

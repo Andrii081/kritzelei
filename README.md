@@ -1,4 +1,4 @@
-# Kritzelei v36 — Doodles / Каракули / Kritzelei
+# Kritzelei v37 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -187,3 +187,8 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 ## v36 — fixes
 - **Moving coordinate axes:** when axes are selected and dragged (or scaled), their numbers and captions now move with them. After moving, the origin lands on a grid line.
 - **Long press is more reliable:** stylus held still **1 s**, finger **0.6 s**. A blue ring grows around the tip while you hold; when it is full the menu opens. On iPad the finger is now also tracked through touch events.
+
+
+## v37 — no empty space before inserted PDFs
+- In endless notebooks the writing page used to keep growing while you scrolled, so an inserted PDF could end up far below your last line. Now a writing page that has other pages after it is only as long as its content plus 15 mm; the extra empty paper stays only on the very last page.
+- Existing notebooks with such empty stretches are tidied automatically when they are opened.
