@@ -428,7 +428,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v37";
+const APP_VER="v38";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -3428,7 +3428,8 @@ const BAD_FILE=tt("badFile");
 // empty writing pages at the end stay at the end, and there is always a page to write on after the document.
 function docAt(l){ l=l||S.pages; let at=l.length; while(at>0&&!l[at-1].bg&&!(l[at-1].strokes||[]).length) at--; return at; }
 function withWritingTail(l){ if(!l.length||l[l.length-1].bg) l.push(newNotePage()); return l; }
-function insertPagesHere(made){ const l=S.pages.slice(), cur=currentPage(), at=Math.max(0,cur?l.indexOf(cur)+1:docAt(l)); trimBeforeDoc(l[at-1]); l.splice(at,0,...made); setPlist(withWritingTail(l),true); }
+// always at the end: after the last page with writing or a document (empty pages at the end stay after it)
+function insertPagesHere(made){ const l=S.pages.slice(), at=docAt(l); trimBeforeDoc(l[at-1]); l.splice(at,0,...made); setPlist(withWritingTail(l),true); }
 async function importInto(f,kind){ if(kind==="pdf") await importPDF(f,S.nb); else await importGoodnotes(f,S.nb); }
 
 /* ---- QR codes on photos and scans ---- */

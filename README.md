@@ -1,4 +1,4 @@
-# Kritzelei v37 — Doodles / Каракули / Kritzelei
+# Kritzelei v38 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -192,3 +192,7 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 ## v37 — no empty space before inserted PDFs
 - In endless notebooks the writing page used to keep growing while you scrolled, so an inserted PDF could end up far below your last line. Now a writing page that has other pages after it is only as long as its content plus 15 mm; the extra empty paper stays only on the very last page.
 - Existing notebooks with such empty stretches are tidied automatically when they are opened.
+
+
+## v38 — documents always go to the end
+- PDF, GoodNotes files and scans are always added at the **end of the notebook**, right after the last page with your writing or the last inserted document, no matter which page is on screen. Empty pages at the end stay after them, and the view jumps to the inserted pages.
