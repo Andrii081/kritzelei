@@ -1,4 +1,4 @@
-# Kritzelei v35 — Doodles / Каракули / Kritzelei
+# Kritzelei v36 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -182,3 +182,8 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 - **Tap the axis letter** (X, Y or Z) and type any other letter or caption, e.g. `t, s` or `F in N`.
 - New checkbox **Numbers on axes** in the Pen options. Ticked: numbers as before (hold a number to change the step). Unticked: the ticks stay without numbers; **tap next to any tick** and type a caption that appears only at that tick (an empty field removes it).
 - Names and captions are saved with the notebook, in backups and in the PDF export; Undo works.
+
+
+## v36 — fixes
+- **Moving coordinate axes:** when axes are selected and dragged (or scaled), their numbers and captions now move with them. After moving, the origin lands on a grid line.
+- **Long press is more reliable:** stylus held still **1 s**, finger **0.6 s**. A blue ring grows around the tip while you hold; when it is full the menu opens. On iPad the finger is now also tracked through touch events.

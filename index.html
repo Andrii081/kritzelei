@@ -175,6 +175,8 @@ button{touch-action:manipulation;cursor:pointer}
 .ctxmenu button[disabled]{opacity:.38}
 .ctxmenu button.danger{color:#c62828}
 .ctxmenu hr{border:0;border-top:1px solid var(--line);margin:3px 6px}
+.lpring{position:fixed;z-index:49;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;border:3px solid var(--accent,#2747c4);opacity:.85;pointer-events:none;transform:scale(.25);animation:lpgrow var(--lpd,1s) linear forwards}
+@keyframes lpgrow{to{transform:scale(1);opacity:.35}}
 .textedit{position:absolute;z-index:3;margin:0;padding:0;border:0;outline:1.5px dashed var(--accent);outline-offset:3px;background:rgba(255,255,255,.55);resize:none;overflow:hidden;line-height:1.3;font-family:var(--f-ui);transform-origin:0 0;min-height:1em;-webkit-user-select:text;user-select:text}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--desk);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
 #toast.on{opacity:1}
@@ -426,7 +428,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v35";
+const APP_VER="v36";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -650,6 +652,9 @@ function mapItem(it,s,ox,oy,dx,dy){
     case "x": o.x=X(o.x); o.y=Y(o.y); o.tw*=s; o.fs*=s; break;
     case "i": o.x=X(o.x); o.y=Y(o.y); o.iw*=s; o.ih*=s; break;
   }
+  // coordinate axes: ticks and numbers are counted from axisOrigin in steps of axisCell - both follow the axis
+  if(Array.isArray(o.axisOrigin)&&o.axisOrigin.length===2) o.axisOrigin=[X(o.axisOrigin[0]),Y(o.axisOrigin[1])];
+  if(o.axisCell&&s!==1) o.axisCell=o.axisCell*s;
   return o;
 }
 function toPolyline(it){
@@ -2594,15 +2599,20 @@ function hitAny(pg,x,y,r,types){ for(let i=pg.strokes.length-1;i>=0;i--){ const 
 function drawLiveSoon(){ if(!liveRaf) liveRaf=requestAnimationFrame(()=>{ liveRaf=0; drawLive(); }); }
 /* ---- long press: menu at that spot (finger ~0.6 s, stylus 2 s, held still) ---- */
 let LP=null, ctxEl=null;
-function lpArm(e,pg,x,y,a){ lpCancel(); const pen=e.pointerType==="pen"||(e.pointerType==="touch"&&S.finger), ms=e.pointerType==="mouse"?700:(pen?2000:600);
-  LP={id:e.pointerId,pg,x,y,cx:e.clientX,cy:e.clientY,a,tol:e.pointerType==="pen"?7:12,rw:pg.el.getBoundingClientRect().width}; LP.t=setTimeout(lpFire,ms); }
-function lpCancel(){ if(LP){ clearTimeout(LP.t); LP=null; } }
+let lpRing=null, ctxAt=0;
+function lpArm(e,pg,x,y,a){ lpCancel(); const pen=e.pointerType==="pen"||(e.pointerType==="touch"&&S.finger), ms=e.pointerType==="mouse"?700:(pen?1000:600);
+  LP={id:e.pointerId,pg,x,y,cx:e.clientX,cy:e.clientY,a,tol:e.pointerType==="pen"?10:14,rw:pg.el.getBoundingClientRect().width}; LP.t=setTimeout(lpFire,ms);
+  const L=LP; L.rt=setTimeout(()=>{ if(LP===L) lpShowRing(L.cx,L.cy,ms-220); },220); }
+// a ring grows around the finger / pen tip while it is held - when it is full the menu opens
+function lpShowRing(cx,cy,ms){ lpHideRing(); lpRing=h("div",{class:"lpring"}); lpRing.style.left=cx+"px"; lpRing.style.top=cy+"px"; lpRing.style.setProperty("--lpd",Math.max(150,ms)+"ms"); document.body.append(lpRing); }
+function lpHideRing(){ if(lpRing){ lpRing.remove(); lpRing=null; } }
+function lpCancel(){ if(LP){ clearTimeout(LP.t); clearTimeout(LP.rt); LP=null; } lpHideRing(); }
 pagesEl.addEventListener("pointermove",(e)=>{ if(LP&&e.pointerId===LP.id&&Math.hypot(e.clientX-LP.cx,e.clientY-LP.cy)>LP.tol) lpCancel(); });
 for(const ev of ["pointerup","pointercancel"]) pagesEl.addEventListener(ev,(e)=>{ if(LP&&e.pointerId===LP.id) lpCancel(); });
 // the menu closes when the sheet is really scrolled (finger scrolling already cancels a long press by itself)
 scroller.addEventListener("scroll",()=>{ if(ctxEl&&Math.abs(scroller.scrollTop-ctxEl._st)+Math.abs(scroller.scrollLeft-ctxEl._sl)>24) closeCtx(); },{passive:true});
 function lpFire(){
-  const L=LP; LP=null; if(!L||pinch) return; const a=L.a;
+  const L=LP; LP=null; lpHideRing(); if(!L||pinch) return; if(Date.now()-ctxAt<900) return; const a=L.a;
   if(a&&act===a){
     if(["grab","erase","measure","axisHold","axisTap","arc2","regionPt"].includes(a.mode)) return; // these keep their own meaning
     act=null; if(liveRaf){ cancelAnimationFrame(liveRaf); liveRaf=0; } clearOverlay("live"); clearTimeout(a.timer); clearTimeout(a.holdT);
@@ -2611,6 +2621,22 @@ function lpFire(){
   }
   vibrate(); openCtx(L.pg,L.x,L.y,L.cx,L.cy,L.rw);
 }
+// fingers: iPad Safari also reports touches directly; this catches a held finger even when pointer events give up
+(()=>{ let T=null;
+  const stop=()=>{ if(T){ clearTimeout(T.t); clearTimeout(T.rt); T=null; lpHideRing(); } };
+  pagesEl.addEventListener("touchstart",(e)=>{
+    stop(); if(e.touches.length!==1||S.finger||!S.nb) return; const t=e.touches[0]; if(t.touchType==="stylus") return;
+    if(e.target.closest&&e.target.closest(".selmenu, textarea, .pfoot, .addpage, select, button")) return;
+    const el=e.target.closest&&e.target.closest(".page"); if(!el) return;
+    T={cx:t.clientX,cy:t.clientY,el};
+    T.rt=setTimeout(()=>{ if(T&&!LP) lpShowRing(T.cx,T.cy,380); },220);
+    T.t=setTimeout(()=>{ const q=T; T=null; lpHideRing(); if(!q||pinch||Date.now()-ctxAt<900||act) return; lpCancel();
+      const r=q.el.getBoundingClientRect(), pg=q.el._pg; if(!pg) return; const [x,y]=localPt({clientX:q.cx,clientY:q.cy},r,pg);
+      vibrate(); openCtx(pg,x,y,q.cx,q.cy,r.width); },600);
+  },{passive:true});
+  pagesEl.addEventListener("touchmove",(e)=>{ if(T){ const t=e.touches[0]; if(e.touches.length!==1||!t||Math.hypot(t.clientX-T.cx,t.clientY-T.cy)>14) stop(); } },{passive:true});
+  pagesEl.addEventListener("touchend",stop,{passive:true}); pagesEl.addEventListener("touchcancel",stop,{passive:true});
+})();
 function closeCtx(){ if(ctxEl){ ctxEl.remove(); ctxEl=null; if(S.sel) showSelection(); } }
 function openCtx(pg,x,y,cx,cy,rw){
   closeCtx(); ensureCanvas(pg);
@@ -2621,7 +2647,7 @@ function openCtx(pg,x,y,cx,cy,rw){
   add(tt("paste"),()=>pasteClip({pg,x,y}),null,!S.clip);
   if(sel){ m.append(h("hr")); add(tt("copy"),withRegion(()=>selCopy())); add(tt("cut"),withRegion(()=>{ selCopy(true); selDelete(); })); add(tt("duplicate"),withRegion(selDuplicate)); add(tt("del"),withRegion(selDelete),"danger"); }
   else if(pg.strokes.length){ m.append(h("hr")); add(tt("selectPage"),()=>setSel(pg,pg.strokes.slice())); }
-  document.body.append(m); ctxEl=m; m._st=scroller.scrollTop; m._sl=scroller.scrollLeft;
+  document.body.append(m); ctxEl=m; ctxAt=Date.now(); m._st=scroller.scrollTop; m._sl=scroller.scrollLeft;
   const r=m.getBoundingClientRect(); let L=cx+12, T=cy-r.height/2;
   if(L+r.width>innerWidth-8) L=cx-12-r.width; m.style.left=Math.max(8,L)+"px"; m.style.top=clamp(T,8,Math.max(8,innerHeight-r.height-8))+"px";
 }
@@ -2947,7 +2973,7 @@ function rotItem(it,cx,cy,da,only){ // only: rotate just the ends of this piece 
   let o=cloneItem(it);
   if(o.t==="r"){ const [a,b,c,d]=bbox(o); o={t:"g",pts:[a,b,c,b,c,d,a,d],closed:true,c:o.c,w:o.w}; }
   if(only){ for(const k of [0,2]){ const x=only[k], y=only[k+1]; if(Math.hypot(x-cx,y-cy)<1) continue; const q=rotPt(cx,cy,da,x,y); o=moveVertex(o,[x,y],q); } return o; }
-  if(isFree(o)){ for(let i=0;i<o.p.length;i+=3){ const q=rotPt(cx,cy,da,o.p[i],o.p[i+1]); o.p[i]=q[0]; o.p[i+1]=q[1]; } }
+  if(isFree(o)){ for(let i=0;i<o.p.length;i+=3){ const q=rotPt(cx,cy,da,o.p[i],o.p[i+1]); o.p[i]=q[0]; o.p[i+1]=q[1]; } if(Array.isArray(o.axisOrigin)) o.axisOrigin=rotPt(cx,cy,da,o.axisOrigin[0],o.axisOrigin[1]); }
   else if(o.t==="g"){ for(let i=0;i<o.pts.length;i+=2){ const q=rotPt(cx,cy,da,o.pts[i],o.pts[i+1]); o.pts[i]=q[0]; o.pts[i+1]=q[1]; } }
   else if(o.t==="o"){ const q=rotPt(cx,cy,da,o.cx,o.cy); o.cx=q[0]; o.cy=q[1]; o.rot=(o.rot||0)+da; }
   else if(o.t==="a"){ const q=rotPt(cx,cy,da,o.cx,o.cy); o.cx=q[0]; o.cy=q[1]; o.a0+=da; }
@@ -3250,7 +3276,9 @@ function lassoEnd(a){
   const items=a.pg.strokes.filter(it=>insideLasso(it,p)), region=regionOf(a.pg,p); if(items.length||region) setSel(a.pg,items,region);
 }
 function selTransformEnd(a){
-  const pg=a.pg, s=a.mode==="selScale"?(a.s||1):1, dx=a.mode==="selMove"?(a.dx||0):0, dy=a.mode==="selMove"?(a.dy||0):0;
+  const pg=a.pg, s=a.mode==="selScale"?(a.s||1):1; let dx=a.mode==="selMove"?(a.dx||0):0, dy=a.mode==="selMove"?(a.dy||0):0;
+  if(s===1&&(Math.abs(dx)>=.5||Math.abs(dy)>=.5)&&!pg.bg){ const ax=S.sel&&S.sel.items.find(it=>Array.isArray(it.axisOrigin)&&it.axisCell>0);
+    if(ax){ const c=ax.axisCell, o=ax.axisOrigin; dx=Math.round((o[0]+dx)/c)*c-o[0]; dy=Math.round((o[1]+dy)/c)*c-o[1]; a.dx=dx; a.dy=dy; } }
   pg.hidden=null;
   if(s===1&&Math.abs(dx)<.5&&Math.abs(dy)<.5){ if(a.R0){ pg.strokes=a.before; S.sel.items=S.sel.items.filter(it=>pg.strokes.includes(it)); a.R0.lifted=false; S.sel.region=a.R0; S.sel.pdf=a.R0; redraw(pg); } else redrawRect(pg,unionBB(S.sel.items)); showSelection(); return; }
   const old=S.sel.items, ni=old.map(it=>{ const n=mapItem(it,s,a.bb[0],a.bb[1],dx,dy); const idx=pg.strokes.indexOf(it); if(idx>=0) pg.strokes[idx]=n; return n; });
