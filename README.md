@@ -1,4 +1,4 @@
-# Kritzelei v38 — Doodles / Каракули / Kritzelei
+# Kritzelei v39 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -196,3 +196,7 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 
 ## v38 — documents always go to the end
 - PDF, GoodNotes files and scans are always added at the **end of the notebook**, right after the last page with your writing or the last inserted document, no matter which page is on screen. Empty pages at the end stay after them, and the view jumps to the inserted pages.
+
+
+## v39 — letters are not mistaken for a selection
+- Writing letters with loops (a, o, e …) on a PDF page sometimes opened the selection menu and showed small circles (the outline points). Now a pen loop selects only when it is clearly a selecting circle: at least 16 mm in one direction and 8 mm in the other, (almost) closed, and not drawn right after writing nearby (pause of at least 0.7 s).

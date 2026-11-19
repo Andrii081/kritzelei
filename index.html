@@ -428,7 +428,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v38";
+const APP_VER="v39";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -3168,7 +3168,9 @@ function autoAreaPath(raw,pg){
   if(w<18||h<18||diag<28||len<diag*1.35) return null;
   const first=pts[0],last=pts[pts.length-1];
   const close=Math.hypot(last[0]-first[0],last[1]-first[1]);
-  if(close>Math.max(18,diag*(pg&&pg.bg?.4:.28))) return null; // on a PDF the loop may stay a little open
+  if(close>Math.max(18,diag*.3)) return null;
+  // a selecting loop is bigger than a letter: at least 16 mm one way and 8 mm the other
+  if(Math.max(w,h)<16*MM||Math.min(w,h)<8*MM) return null;
   // Avoid treating tiny loops inside a single handwritten glyph as a selection gesture.
   const cell=pagePaper(pg)==="mm"?5*MM:axisGridCell(pg);
   if(w<cell*.7&&h<cell*.7) return null;
@@ -3176,8 +3178,12 @@ function autoAreaPath(raw,pg){
   for(let i=0;i<pts.length;i++) poly.push(pts[i][0],pts[i][1]);
   return poly;
 }
+// time and place of the previous pen stroke: a loop drawn right after writing nearby is a letter, not a selection
+let lastInk={t:0,pg:null,b:null};
 function tryAutoAreaSelect(pg,raw,gestureItem){
   if(!pg||!raw||!gestureItem) return false;
+  const prev=lastInk, b=bbox(raw); lastInk={t:Date.now(),pg,b};
+  if(prev.pg===pg&&prev.b&&Date.now()-prev.t<700){ const gap=Math.max(prev.b[0]-b[2],b[0]-prev.b[2],prev.b[1]-b[3],b[1]-prev.b[3],0); if(gap<40*MM) return false; }
   const poly=autoAreaPath(raw,pg); if(!poly) return false;
   const items=pg.strokes.filter(it=>it!==gestureItem&&insideLasso(it,poly)), region=pg.bg?regionOf(pg,poly):null;
   if(!items.length&&!region) return false;
