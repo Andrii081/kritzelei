@@ -428,7 +428,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v39";
+const APP_VER="v40";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -808,8 +808,14 @@ function axisTicks(it,fn){
   // Clip ticks to the ends of each stroke, including optional negative Z side.
   const from=Math.max(-600,Math.ceil((a.lo-a.o)/a.unit-1e-5));
   const to=Math.min(600,Math.floor((a.hi-a.o)/a.unit+1e-5));
+  // where the arrow tip and the other end lie along the axis (same measure as a.o + i*unit)
+  const pp=it.p, L=Math.hypot(pp[3]-pp[0],pp[4]-pp[1]), head=Math.min(18,L*.18)+4;
+  const along=(x,y)=>a.kind==="x"?x:a.kind==="y"?y:(x-a.origin[0])*a.ux+(y-a.origin[1])*a.uy;
+  const tipPos=along(pp[3],pp[4]), endPos=along(pp[0],pp[1]);
   for(let i=from;i<=to;i++){
     if(!i)continue;
+    const pos=a.o+i*a.unit;
+    if(Math.abs(pos-tipPos)<head||Math.abs(pos-endPos)<a.unit*.35)continue; // the arrow end stays clean, no cap at the far end
     const n=a.kind==="y"?-i:i; // Y values increase upwards.
     const x=a.kind==="x"?a.o+i*a.unit:a.kind==="z"?a.origin[0]+a.ux*i*a.unit:a.origin[0];
     const y=a.kind==="y"?a.o+i*a.unit:a.kind==="z"?a.origin[1]+a.uy*i*a.unit:a.origin[1];
@@ -2316,6 +2322,38 @@ function markEqualCandidate(raw,item,pg){
   if(!item.autoLine)item.autoLine=Date.now();
 }
 
+/* v40: draw a straight line on from the tip of an axis or an arrow -> it gets longer, the arrowhead moves to the new end */
+function chordOf(it){
+  let q=null; if(it.t==="g"&&it.pts) q=it.pts.slice(); else if(it.p&&(it.t==="p"||it.t==="b")){ q=[]; for(let i=0;i<it.p.length;i+=3) q.push(it.p[i],it.p[i+1]); }
+  if(!q||q.length<4) return null;
+  const a=[q[0],q[1]], b=[q[q.length-2],q[q.length-1]], L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(L<4*MM) return null;
+  let dev=0; for(let i=0;i<q.length;i+=2){ const t=Math.abs((b[0]-a[0])*(a[1]-q[i+1])-(a[0]-q[i])*(b[1]-a[1]))/L; dev=Math.max(dev,t); }
+  return dev<=Math.max(4,L*.07)?{a,b,L}:null; // must be a straight line
+}
+function tryExtendArrow(pg,it){
+  if(!pg||!it||it.axisName) return false;
+  const c=chordOf(it); if(!c) return false;
+  const near=6*MM, cos=Math.cos(16*Math.PI/180);
+  for(let k=pg.strokes.length-1;k>=0;k--){
+    const s=pg.strokes[k], axis=["x","y","z"].includes(s.axisName)&&s.p&&s.p.length===6, arrow=isArrowLine(s);
+    if(!axis&&!arrow) continue;
+    const q=axis?s.p:s.pts, st=axis?3:2, B=[q[0],q[1]], T=[q[st],q[st+1]], ol=Math.hypot(T[0]-B[0],T[1]-B[1]); if(ol<1) continue;
+    const u=[(T[0]-B[0])/ol,(T[1]-B[1])/ol];
+    for(const [P,F] of [[c.a,c.b],[c.b,c.a]]){
+      const dv=[F[0]-P[0],F[1]-P[1]], dl=Math.hypot(dv[0],dv[1]); if(dl<1) continue; const dot=(dv[0]*u[0]+dv[1]*u[1])/dl;
+      let end=null;
+      if(Math.hypot(P[0]-T[0],P[1]-T[1])<near&&dot>cos) end="tip";
+      else if(axis&&s.axisName!=="z"&&Math.hypot(P[0]-B[0],P[1]-B[1])<near&&dot<-cos) end="base";
+      if(!end) continue;
+      const t=(F[0]-B[0])*u[0]+(F[1]-B[1])*u[1]; let nx=B[0]+u[0]*t, ny=B[1]+u[1]*t;
+      if(axis&&s.axisName==="x"){ nx=paperSnapX(nx,pg); ny=B[1]; } else if(axis&&s.axisName==="y"){ ny=paperSnapY(ny,pg); nx=B[0]; }
+      const n=cloneItem(s), nq=axis?n.p:n.pts;
+      if(end==="tip"){ if(t<=ol+1) continue; nq[st]=nx; nq[st+1]=ny; } else { if(t>=-1) continue; nq[0]=nx; nq[1]=ny; }
+      const before=pg.strokes.slice(); pg.strokes[k]=n; redraw(pg); commitPage(pg,before); return true;
+    }
+  }
+  return false;
+}
 function snapAxes(pg,latest){
   if(!S.smartInk||!pg||!latest||!pg.strokes.includes(latest))return false;
   // Z is tested against every existing XY system, independently of stroke
@@ -2777,6 +2815,7 @@ function endPointer(e){
       // In handwriting mode, preserve actual letter strokes; shape correction
       // and destructive gestures must not run on the same contact.
       let it=up&&(S.smartInk||S.scratchErase)&&S.tool==="pen"?smartInkEnd(a):a.rec||a.stroke;
+      if(it&&up&&S.tool==="pen"&&tryExtendArrow(a.pg,it)) return; // drawn on from an arrow tip: the arrow got longer
       if(it){
         if(up&&S.tool==="pen"&&!a.rec){
           if(tryCommitEquals(a.pg,a.stroke,it))return;
@@ -2787,7 +2826,7 @@ function endPointer(e){
         if(up&&S.tool==="pen"&&!a.rec) tryAutoAreaSelect(a.pg,a.stroke,it);
       } return;
     }
-    case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; commitAdd(a.pg,a.stroke); if(up&&S.smartInk) snapAxes(a.pg,a.stroke); return; }
+    case "line": { const p=a.stroke.p; if(p.length<6||Math.hypot(p[3]-p[0],p[4]-p[1])<3) return; if(up&&tryExtendArrow(a.pg,a.stroke)) return; commitAdd(a.pg,a.stroke); if(up&&S.smartInk) snapAxes(a.pg,a.stroke); return; }
     case "shape": shapeEnd(a); return;
     case "arc2": arc2End(a); return;
     case "erase": commitPage(a.pg,a.before); return;

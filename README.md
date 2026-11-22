@@ -1,4 +1,4 @@
-# Kritzelei v39 — Doodles / Каракули / Kritzelei
+# Kritzelei v40 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -200,3 +200,8 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 
 ## v39 — letters are not mistaken for a selection
 - Writing letters with loops (a, o, e …) on a PDF page sometimes opened the selection menu and showed small circles (the outline points). Now a pen loop selects only when it is clearly a selecting circle: at least 16 mm in one direction and 8 mm in the other, (almost) closed, and not drawn right after writing nearby (pause of at least 0.7 s).
+
+
+## v40 — clean axis ends, extending arrows
+- Coordinate axes no longer get a tick under the arrowhead or a tick "cap" at the other end.
+- **Extending:** draw a straight line on from the tip of an axis or of an arrow, in the same direction (pen or line tool). The axis / arrow becomes one longer line and the arrowhead moves to the new end. An axis can also be extended at its other end; axis ends land on the grid. One Undo takes it back.
