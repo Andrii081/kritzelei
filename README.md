@@ -1,4 +1,4 @@
-# Kritzelei v40 — Doodles / Каракули / Kritzelei
+# Kritzelei v41 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -205,3 +205,8 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 ## v40 — clean axis ends, extending arrows
 - Coordinate axes no longer get a tick under the arrowhead or a tick "cap" at the other end.
 - **Extending:** draw a straight line on from the tip of an axis or of an arrow, in the same direction (pen or line tool). The axis / arrow becomes one longer line and the arrowhead moves to the new end. An axis can also be extended at its other end; axis ends land on the grid. One Undo takes it back.
+
+
+## v41 — typing with the keyboard
+- Text tool (**T**): new button **⌨ Keyboard** in its options. It opens a text box on the page you are looking at (below your last writing, otherwise at the top of the visible part) and brings up the on-screen keyboard. Enter starts a new line; tap outside to finish.
+- If you tap the page with the stylus, iPadOS shows Scribble instead of the keyboard - then tap the box with your finger or use the Keyboard button (a one-time hint explains this).

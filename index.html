@@ -428,7 +428,7 @@ const SHAPE_KEYS=["circle","ellipse","rect","tri","arc","arrow","dim","adim"];
 const SHAPES_L=()=>SHAPE_KEYS.map(k=>[k,tt("sh_"+k)]);
 const SPINES=["#2747c4","#c2362b","#1d8a4b","#d98a00","#7a3fc0","#147f8a","#3b4a5e"];
 const ACC="#2747c4";
-const APP_VER="v40";
+const APP_VER="v41";
 const JSQR_URL="jsQR.min.js";
 const PDFJS_URL="pdf.min.js";
 const PDFJS_WORKER_URL="pdf.worker.min.js";
@@ -1581,6 +1581,7 @@ function renderOptsInner(o){
   if(t==="shape") o.append(seg(shapeItems(SHAPES_L()),S.shape,v=>{ S.shape=v; clearArc(); clearPick(); savePrefs(); renderOpts(); },tt("shape")));
   if(["pen","hl","ln","shape","text"].includes(t)) o.append(colorRow(t==="hl"?"hl":"pen"));
   if(["pen","hl","ln","shape"].includes(t)) o.append(widthRow(t==="hl"?"hl":"pen"));
+  if(t==="text"){ o.append(h("button",{class:"btn primary",type:"button",id:"kbdBtn",title:KBT("hint"),onclick:()=>typeWithKeyboard()},"⌨ "+KBT("kbd"))); }
   if(t==="text") o.append(seg([["0",tt("small")],["1",tt("medium")],["2",tt("large")]],String(S.txtSize),v=>{ S.txtSize=+v; savePrefs(); },tt("textSize")));
   if(t==="ln"){
     o.append(...numField("lnLen",tt("length"),tt("cm"),S.lnLen,v=>{ const n=num(v); S.lnLen=(n!==null&&n>0)?Math.min(n,100):null; }));
@@ -3373,8 +3374,26 @@ function pasteClip(at){
 function selectAllOnPage(){ const pg=currentPage(); if(!pg||!pg.strokes.length){ toast(tt("pageEmpty")); return; } ensureCanvas(pg); setSel(pg,pg.strokes.slice()); }
 
 /* ---- text ---- */
+const KBT_ALL={
+  ru:{kbd:"Клавиатура",hint:"Новое текстовое поле с экранной клавиатурой",pen:"Клавиатура не появилась? Коснитесь поля пальцем или нажмите «Клавиатура» в строке сверху."},
+  uk:{kbd:"Клавіатура",hint:"Нове текстове поле з екранною клавіатурою",pen:"Клавіатура не з'явилась? Торкніться поля пальцем або натисніть «Клавіатура» в рядку зверху."},
+  de:{kbd:"Tastatur",hint:"Neues Textfeld mit Bildschirmtastatur",pen:"Keine Tastatur? Das Feld mit dem Finger antippen oder oben auf „Tastatur“ tippen."},
+  en:{kbd:"Keyboard",hint:"New text box with the on-screen keyboard",pen:"No keyboard? Tap the box with your finger or tap “Keyboard” in the bar above."}
+};
+const KBT=(k)=>(KBT_ALL[LANG]||KBT_ALL.en)[k];
+// a text box on the page on screen: under the last writing that is visible, otherwise at the top of the visible part
+function typeWithKeyboard(){
+  const pg=currentPage(); if(!pg||!pg.el) return; ensureCanvas(pg);
+  const er=pg.el.getBoundingClientRect(), sr=scroller.getBoundingClientRect(), k=er.width/W;
+  const v0=(Math.max(er.top,sr.top)-er.top)/k, v1=(Math.min(er.bottom,sr.bottom)-er.top)/k, fs=TXT_FS[S.txtSize];
+  const cb=pg.strokes.length?contentBottom(pg):0;
+  let y=cb+fs*.6; if(y<v0+20||y>v1-fs*3) y=v0+30;
+  startText(pg,null,60,Math.max(8,y)); // called from a finger tap on the button: iPadOS shows the keyboard
+}
 let textEd=null;
-function textTap(a){ const it=hitAny(a.pg,a.x0,a.y0,tolU(a)*.5,["x"]); if(it) startText(a.pg,it); else startText(a.pg,null,a.x0,a.y0-TXT_FS[S.txtSize]*.65); }
+function textTap(a){ const it=hitAny(a.pg,a.x0,a.y0,tolU(a)*.5,["x"]); if(it) startText(a.pg,it); else startText(a.pg,null,a.x0,a.y0-TXT_FS[S.txtSize]*.65);
+  // with the stylus iPadOS shows Scribble (handwriting into the box) instead of the keyboard - say once how to get it
+  if(a.pen){ try{ if(!localStorage.getItem("kritzelei.kbdHint")){ localStorage.setItem("kritzelei.kbdHint","1"); setTimeout(()=>toast(KBT("pen")),400); } }catch(e){} } }
 function startText(pg,item,x,y){
   finishText(); ensureCanvas(pg);
   const it=item?cloneItem(item):{t:"x",x:Math.max(4,x),y:Math.max(4,y),tw:Math.max(160,Math.min(560,W-Math.max(4,x)-24)),fs:TXT_FS[S.txtSize],c:S.penColor,text:""};
