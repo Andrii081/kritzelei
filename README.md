@@ -1,4 +1,4 @@
-# Kritzelei v41 — Doodles / Каракули / Kritzelei
+# Kritzelei v42 — Doodles / Каракули / Kritzelei
 
 **Free handwriting notebook for iPad** — write with Apple Pencil or a simple stylus. Works offline, no account, no ads, 15 languages.
 
@@ -210,3 +210,8 @@ Idea, concept and development: **Andrii Manoilo**, built with the help of AI.
 ## v41 — typing with the keyboard
 - Text tool (**T**): new button **⌨ Keyboard** in its options. It opens a text box on the page you are looking at (below your last writing, otherwise at the top of the visible part) and brings up the on-screen keyboard. Enter starts a new line; tap outside to finish.
 - If you tap the page with the stylus, iPadOS shows Scribble instead of the keyboard - then tap the box with your finger or use the Keyboard button (a one-time hint explains this).
+
+
+## v42 — formatted typed text
+- Text tool (**T**) options: **font** (Rubik, Helvetica, Avenir, Georgia, Times, Courier, Noteworthy, Caveat), **size** in pt (8–72), **colour**, **Regular / Semibold / Bold**, **Italic**, **Underline**, **align** left / centre / right.
+- The format applies to the whole text box being typed (live, the keyboard stays open) and to every new box. Tapping an existing text loads its format into the bar; changes are saved and can be undone.
